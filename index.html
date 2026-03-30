@@ -1582,177 +1582,261 @@ function Reports({ gifts, products }) {
 /* ══════════════════════════════════
    SHARE / WHATSAPP CARD GENERATOR
 ══════════════════════════════════ */
-async function generateShareCard(gifts, title, subtitle, extraContext) {
-  const issued = gifts.filter(g=>g.issued);
+async function generateShareCard(gifts, title, subtitle, extraContext, treeData) {
+  const issued  = gifts.filter(g=>g.issued);
   const pending = gifts.filter(g=>!g.issued);
-  const planAmt = gifts.reduce((s,g)=>s+Number(g.giftMrp||0),0);
-  const actAmt = issued.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+  const planAmt   = gifts.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+  const actAmt    = issued.reduce((s,g)=>s+Number(g.giftMrp||0),0);
   const planSales = gifts.reduce((s,g)=>s+(g.planSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0),0);
-  const actSales = issued.reduce((s,g)=>s+(g.actualSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0),0);
+  const actSales  = issued.reduce((s,g)=>s+(g.actualSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0),0);
   const roi = actAmt>0&&actSales>0?(actSales/actAmt).toFixed(2):null;
   const pct = gifts.length>0?Math.round(issued.length/gifts.length*100):0;
   const roiLbl = roi?(Number(roi)<3?"Poor":Number(roi)<4?"Average":Number(roi)<5?"Good":"Excellent"):"—";
   const roiCol = roi?(Number(roi)<3?"#dc2626":Number(roi)<4?"#d97706":Number(roi)<5?"#2563eb":"#16a34a"):"#94a3b8";
-  const LOGO = "data:image/jpeg;base64,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";
+  const level = extraContext||"rsm";
   const dateStr = new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"});
 
-  // Build level-aware detail section
-  const level = extraContext || "rsm";   // rsm | asm | hq | pending
-  const treeDataObj = treeData || {};
-
-  // ASM breakdown (used for RSM level)
-  const asmRows = ["Patna ASM","Darbhanga ASM","Saharsa ASM"].map(asm=>{
-    const ag = gifts.filter(g=>g.asmName===asm);
-    const ai = ag.filter(g=>g.issued);
-    const aActSales = ai.reduce((s,g)=>s+(g.actualSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0),0);
-    const aActAmt  = ai.reduce((s,g)=>s+Number(g.giftMrp||0),0);
-    const aRoi = aActAmt>0&&aActSales>0?(aActSales/aActAmt).toFixed(2):null;
-    const aRoiLbl = aRoi?(Number(aRoi)<3?"Poor":Number(aRoi)<4?"Avg":Number(aRoi)<5?"Good":"Excel"):"—";
-    const aRoiCol = aRoi?(Number(aRoi)<3?"#dc2626":Number(aRoi)<4?"#d97706":Number(aRoi)<5?"#2563eb":"#16a34a"):"#94a3b8";
+  // ASM breakdown
+  const asmRows = ASM_LIST.map(asm=>{
+    const ag=gifts.filter(g=>g.asmName===asm);
+    const ai=ag.filter(g=>g.issued);
+    const aActSales=ai.reduce((s,g)=>s+(g.actualSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0),0);
+    const aActAmt=ai.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+    const aRoi=aActAmt>0&&aActSales>0?(aActSales/aActAmt).toFixed(2):null;
+    const aRoiLbl=aRoi?(Number(aRoi)<3?"Poor":Number(aRoi)<4?"Avg":Number(aRoi)<5?"Good":"Excellent"):"—";
+    const aRoiCol=aRoi?(Number(aRoi)<3?"#dc2626":Number(aRoi)<4?"#d97706":Number(aRoi)<5?"#2563eb":"#16a34a"):"#94a3b8";
     return {asm,planned:ag.length,issued:ai.length,pending:ag.length-ai.length,planAmt:ag.reduce((s,g)=>s+Number(g.giftMrp||0),0),actSales:aActSales,roi:aRoi,roiLbl:aRoiLbl,roiCol:aRoiCol};
   }).filter(r=>r.planned>0);
 
-  const kpiItems = [
-    ["Gifts Planned", gifts.length, "#1e3a5f", "#eff6ff"],
-    ["Issued", issued.length, "#16a34a", "#f0fdf4"],
-    ["Pending", pending.length, "#d97706", "#fffbeb"],
-    ["Gift Plan Amt", "\u20b9"+Math.round(planAmt).toLocaleString("en-IN"), "#7c3aed", "#f5f3ff"],
-    ["Actual Sales", "\u20b9"+Math.round(actSales).toLocaleString("en-IN"), "#0369a1", "#f0f9ff"],
-    ["Overall ROI", roi?roi+"x \u2014 "+roiLbl:"\u2014", roiCol, "white"],
-  ];
-
-  // HQ breakdown (used for ASM level share)
+  // HQ breakdown (ASM level)
   const hqRows = (() => {
-    if(level !== "asm") return [];
-    const hqMap = {};
-    gifts.forEach(g=>{ const h=g.hqName||"(No HQ)"; if(!hqMap[h]) hqMap[h]={gifts:[],issued:0,planAmt:0,actSales:0}; hqMap[h].gifts.push(g); hqMap[h].planAmt+=Number(g.giftMrp||0); if(g.issued){hqMap[h].issued++;hqMap[h].actSales+=(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);} });
-    return Object.entries(hqMap).map(([hq,h])=>({hq,planned:h.gifts.length,issued:h.issued,pending:h.gifts.length-h.issued,planAmt:h.planAmt,actSales:h.actSales}));
+    if(level!=="asm") return [];
+    const hqMap={};
+    gifts.forEach(g=>{const h=g.hqName||"(No HQ)";if(!hqMap[h])hqMap[h]={planned:0,issued:0,planAmt:0,actSales:0};hqMap[h].planned++;hqMap[h].planAmt+=Number(g.giftMrp||0);if(g.issued){hqMap[h].issued++;hqMap[h].actSales+=(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);}});
+    return Object.entries(hqMap).map(([hq,h])=>({hq,...h,pending:h.planned-h.issued}));
   })();
 
-  // Doctor gift list (used for HQ level share)
-  const doctorRows = level==="hq" ? gifts.map(g=>({name:g.doctorName,gift:g.giftName,mrp:Number(g.giftMrp||0),month:g.month,status:g.issued?"✓ Issued":"⏳ Pending",actSales:(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)})) : [];
+  // Doctor rows (HQ level)
+  const doctorRows = level==="hq"?gifts.map(g=>({name:g.doctorName,gift:g.giftName,mrp:Number(g.giftMrp||0),month:g.month,status:g.issued?"✓ Issued":"⏳ Pending",actSales:(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)})):[];
 
-  const asmTableRows = asmRows.map(r=>`<tr style="border-bottom:1px solid #f1f5f9">
-    <td style="padding:8px 10px;font-weight:700;color:#1e293b">${r.asm}</td>
-    <td style="padding:8px 10px;text-align:center;color:#1e3a5f;font-weight:700">${r.planned}</td>
-    <td style="padding:8px 10px;text-align:center;color:#16a34a;font-weight:700">${r.issued}</td>
-    <td style="padding:8px 10px;text-align:center;color:#d97706;font-weight:700">${r.pending}</td>
-    <td style="padding:8px 10px;text-align:right;color:#7c3aed;font-weight:700">\u20b9${Math.round(r.planAmt).toLocaleString("en-IN")}</td>
-    <td style="padding:8px 10px;text-align:right;color:#0369a1;font-weight:700">\u20b9${Math.round(r.actSales).toLocaleString("en-IN")}</td>
-    <td style="padding:8px 10px;text-align:right;font-weight:800;color:${r.roiCol}">${r.roi?r.roi+"x "+r.roiLbl:"\u2014"}</td>
-  </tr>`).join("");
-
-  const pendingAsmChips = ["Patna ASM","Darbhanga ASM","Saharsa ASM"].map(asm=>{
-    const n=pending.filter(g=>g.asmName===asm).length;
-    return n>0?`<span style="background:white;border:1px solid #fde68a;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700;color:#92400e">${asm}: ${n}</span>`:"";
-  }).join("");
-
-  const html = `<div id="share-card" style="width:900px;background:#f8fafc;font-family:Arial,Helvetica,sans-serif;border-radius:20px;overflow:hidden;">
-    <div style="background:white;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #e2e8f0">
-      <img src="${LOGO}" style="height:38px;object-fit:contain"/>
-      <div style="text-align:right">
-        <div style="font-size:18px;font-weight:900;color:#1e3a5f">${title}</div>
-        <div style="font-size:12px;color:#64748b;margin-top:2px">${subtitle||dateStr} &nbsp;&middot;&nbsp; RSM Bihar &nbsp;&middot;&nbsp; GiftTrack v1.3</div>
-      </div>
-    </div>
-    <div style="display:flex;border-bottom:2px solid #e2e8f0">
-      ${kpiItems.map(([l,v,col,bg])=>`<div style="flex:1;padding:16px 10px;background:${bg};border-right:1px solid #e2e8f0;text-align:center">
-        <div style="font-size:9px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">${l}</div>
-        <div style="font-size:17px;font-weight:900;color:${col}">${v}</div>
-      </div>`).join("")}
-    </div>
-    <div style="background:white;padding:10px 28px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:12px">
-      <div style="flex:1;background:#e2e8f0;border-radius:999px;height:10px;overflow:hidden">
-        <div style="background:linear-gradient(90deg,#1e3a5f,#2563eb);height:100%;width:${pct}%;border-radius:999px"></div>
-      </div>
-      <div style="font-size:13px;font-weight:900;color:#1e3a5f;white-space:nowrap">${pct}% Issued</div>
-    </div>
-    ${(level==="rsm"||level==="dashboard"||!level) && asmRows.length>0?`<div style="padding:16px 28px;background:white;border-bottom:1px solid #e2e8f0">
-      <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">ASM-wise Breakdown</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:#f8fafc">
-          <th style="padding:8px 10px;text-align:left;font-weight:800;color:#475569;border-bottom:1px solid #e2e8f0">ASM</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:800;color:#475569;border-bottom:1px solid #e2e8f0">Planned</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:800;color:#16a34a;border-bottom:1px solid #e2e8f0">Issued</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:800;color:#d97706;border-bottom:1px solid #e2e8f0">Pending</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:800;color:#7c3aed;border-bottom:1px solid #e2e8f0">Gift Amt</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:800;color:#0369a1;border-bottom:1px solid #e2e8f0">Act Sales</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:800;color:#475569;border-bottom:1px solid #e2e8f0">ROI</th>
-        </tr></thead>
-        <tbody>${asmTableRows}</tbody>
-      </table>
-    </div>`:""}
-    ${level==="asm" && hqRows.length>0?`<div style="padding:16px 28px;background:white;border-bottom:1px solid #e2e8f0">
-      <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">HQ-wise Breakdown</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:#f8fafc">
-          <th style="padding:8px 10px;text-align:left;font-weight:800;color:#475569;border-bottom:1px solid #e2e8f0">HQ</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:800;color:#475569;border-bottom:1px solid #e2e8f0">Planned</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:800;color:#16a34a;border-bottom:1px solid #e2e8f0">Issued</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:800;color:#d97706;border-bottom:1px solid #e2e8f0">Pending</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:800;color:#7c3aed;border-bottom:1px solid #e2e8f0">Gift Amt</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:800;color:#0369a1;border-bottom:1px solid #e2e8f0">Act Sales</th>
-        </tr></thead>
-        <tbody>${hqRows.map(r=>`<tr style="border-bottom:1px solid #f1f5f9">
-          <td style="padding:8px 10px;font-weight:700;color:#1e293b">${r.hq}</td>
-          <td style="padding:8px 10px;text-align:center;color:#1e3a5f;font-weight:700">${r.planned}</td>
-          <td style="padding:8px 10px;text-align:center;color:#16a34a;font-weight:700">${r.issued}</td>
-          <td style="padding:8px 10px;text-align:center;color:#d97706;font-weight:700">${r.pending}</td>
-          <td style="padding:8px 10px;text-align:right;color:#7c3aed;font-weight:700">&#8377;${Math.round(r.planAmt).toLocaleString("en-IN")}</td>
-          <td style="padding:8px 10px;text-align:right;color:#0369a1;font-weight:700">&#8377;${Math.round(r.actSales).toLocaleString("en-IN")}</td>
-        </tr>`).join("")}</tbody>
-      </table>
-    </div>`:""}
-    ${level==="hq" && doctorRows.length>0?`<div style="padding:16px 28px;background:white;border-bottom:1px solid #e2e8f0">
-      <div style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px">Doctor-wise Gift Details</div>
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr style="background:#f8fafc">
-          <th style="padding:8px 10px;text-align:left;font-weight:800;color:#475569;border-bottom:1px solid #e2e8f0">Doctor</th>
-          <th style="padding:8px 10px;text-align:left;font-weight:800;color:#475569;border-bottom:1px solid #e2e8f0">Gift</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:800;color:#475569;border-bottom:1px solid #e2e8f0">Month</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:800;color:#7c3aed;border-bottom:1px solid #e2e8f0">MRP</th>
-          <th style="padding:8px 10px;text-align:center;font-weight:800;color:#475569;border-bottom:1px solid #e2e8f0">Status</th>
-          <th style="padding:8px 10px;text-align:right;font-weight:800;color:#0369a1;border-bottom:1px solid #e2e8f0">Act Sales</th>
-        </tr></thead>
-        <tbody>${doctorRows.map(r=>`<tr style="border-bottom:1px solid #f1f5f9">
-          <td style="padding:8px 10px;font-weight:700;color:#1e293b">${r.name}</td>
-          <td style="padding:8px 10px;color:#475569">${r.gift}</td>
-          <td style="padding:8px 10px;text-align:center;color:#64748b;font-size:11px">${r.month}</td>
-          <td style="padding:8px 10px;text-align:right;color:#7c3aed;font-weight:700">&#8377;${Math.round(r.mrp).toLocaleString("en-IN")}</td>
-          <td style="padding:8px 10px;text-align:center;font-weight:700;color:${r.status.includes("Issued")?"#16a34a":"#d97706"}">${r.status}</td>
-          <td style="padding:8px 10px;text-align:right;color:#0369a1;font-weight:700">${r.actSales>0?"&#8377;"+Math.round(r.actSales).toLocaleString("en-IN"):"—"}</td>
-        </tr>`).join("")}</tbody>
-      </table>
-    </div>`:""}
-    ${pending.length>0?`<div style="padding:12px 28px;background:#fffbeb;border-bottom:1px solid #fde68a">
-      <div style="font-size:10px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">&#9203; Pending &mdash; ${pending.length} gifts not yet issued</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${pendingAsmChips}</div>
-    </div>`:""}
-    <div style="padding:10px 28px;background:white;text-align:center;font-size:10px;color:#94a3b8">
-      GiftTrack v1.3 &middot; gifts.aldancare.com &middot; Generated ${dateStr}
-    </div>
-  </div>`;
-  const wrap = document.createElement("div");
-  wrap.style.cssText = "position:fixed;left:-9999px;top:0;z-index:-999";
-  wrap.innerHTML = html;
-  document.body.appendChild(wrap);
-  await new Promise(r => setTimeout(r, 400));
-  try {
-    const card = wrap.querySelector("#share-card");
-    const canvas = await html2canvas(card, { scale: 1.5, useCORS: true, logging: false, backgroundColor: "#ffffff", allowTaint: false, imageTimeout: 10000 });
-    const dataUrl = canvas.toDataURL("image/png");
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      const win = window.open("", "_blank");
-      win.document.write(`<html><body style="margin:0;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:16px"><img src="${dataUrl}" style="max-width:100%;border-radius:12px"><p style="color:rgba(255,255,255,0.4);font-family:sans-serif;text-align:center;font-size:12px;margin-top:12px">Long press → Save to Photos or Share</p></body></html>`);
+  // ── Draw on Canvas ──
+  const W = 900;
+  const fmtN = n => "₹"+Math.round(n).toLocaleString("en-IN");
+  const tf = (ctx,text,x,y,size,weight,color,align="left",maxW) => {
+    ctx.font = `${weight} ${size}px Arial`;
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    if(maxW) {
+      // truncate if needed
+      let t = text;
+      while(ctx.measureText(t).width > maxW && t.length > 3) t = t.slice(0,-1);
+      if(t!==text) t=t.slice(0,-1)+"…";
+      ctx.fillText(t,x,y);
     } else {
-      const a = document.createElement("a");
-      a.href = dataUrl; a.download = `GiftTrack_${title.replace(/[^a-z0-9]/gi,"_")}.png`; a.click();
+      ctx.fillText(text,x,y);
     }
-  } finally {
-    document.body.removeChild(wrap);
+    ctx.textAlign = "left";
+  };
+  const rect = (ctx,x,y,w,h,color,radius=0) => {
+    ctx.fillStyle = color;
+    if(radius){ctx.beginPath();ctx.roundRect(x,y,w,h,radius);ctx.fill();}
+    else{ctx.fillRect(x,y,w,h);}
+  };
+  const line = (ctx,x1,y1,x2,y2,color,width=1) => {
+    ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  };
+
+  // Calculate dynamic height
+  let detailRows = level==="rsm"||level==="rsm"||!level ? asmRows.length :
+                   level==="asm" ? hqRows.length :
+                   level==="hq" ? doctorRows.length :
+                   level==="pending" ? Math.min(pending.length,10) : 0;
+  const H = 80 + 60 + 120 + 60 + 20 + (detailRows>0 ? 40 + detailRows*38 + 20 : 0) + (pending.length>0&&level!=="pending" ? 60 : 0) + 40;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W*2; canvas.height = H*2;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(2,2);
+
+  let y = 0;
+
+  // ── HEADER ──
+  rect(ctx,0,y,W,72,"#ffffff");
+  line(ctx,0,72,W,72,"#e2e8f0");
+  // Logo text fallback (draw "ALDAN" in brand color)
+  rect(ctx,20,14,44,44,"#eff6ff",8);
+  tf(ctx,"A",42,46,28,"900","#1e3a5f","center");
+  tf(ctx,"GiftTrack",76,32,18,"900","#1e3a5f");
+  tf(ctx,"v1.3 · "+dateStr,76,52,10,"700","#94a3b8");
+  tf(ctx,title,W-20,32,17,"900","#1e3a5f","right",500);
+  tf(ctx,subtitle||"RSM Bihar",W-20,52,11,"600","#64748b","right");
+  y = 72;
+
+  // ── KPI STRIP ──
+  const kpis = [
+    {l:"Planned",v:String(gifts.length),c:"#1e3a5f",bg:"#eff6ff"},
+    {l:"Issued",v:String(issued.length),c:"#16a34a",bg:"#f0fdf4"},
+    {l:"Pending",v:String(pending.length),c:"#d97706",bg:"#fffbeb"},
+    {l:"Gift Amt",v:fmtN(planAmt),c:"#7c3aed",bg:"#f5f3ff"},
+    {l:"Act Sales",v:fmtN(actSales),c:"#0369a1",bg:"#f0f9ff"},
+    {l:"ROI",v:roi?roi+"x "+roiLbl:"—",c:roiCol,bg:"#f8fafc"},
+  ];
+  const kW = W/kpis.length;
+  kpis.forEach((k,i)=>{
+    rect(ctx,i*kW,y,kW,60,k.bg);
+    line(ctx,(i+1)*kW,y,(i+1)*kW,y+60,"#e2e8f0");
+    tf(ctx,k.l,i*kW+kW/2,y+16,9,"800","#94a3b8","center");
+    tf(ctx,k.v,i*kW+kW/2,y+42,14,"900",k.c,"center",kW-8);
+  });
+  line(ctx,0,y+60,W,y+60,"#e2e8f0",2);
+  y += 60;
+
+  // ── PROGRESS BAR ──
+  rect(ctx,0,y,W,36,"#ffffff");
+  tf(ctx,"Collection Progress",20,y+14,10,"700","#94a3b8");
+  rect(ctx,20,y+20,W-120,8,"#e2e8f0",4);
+  if(pct>0) rect(ctx,20,y+20,Math.max((W-120)*pct/100,0),8,"#2563eb",4);
+  tf(ctx,pct+"%  ("+issued.length+"/"+gifts.length+")",W-16,y+27,12,"900","#1e3a5f","right");
+  line(ctx,0,y+36,W,y+36,"#e2e8f0");
+  y += 36;
+
+  // ── DETAIL TABLE ──
+  const drawTableHeader = (cols,ys) => {
+    rect(ctx,0,ys,W,28,"#1e3a5f");
+    let cx=8;
+    cols.forEach(([label,w,align])=>{
+      tf(ctx,label,align==="right"?cx+w-4:cx,ys+19,9,"800","#ffffff",align==="right"?"right":"left");
+      cx+=w;
+    });
+    return ys+28;
+  };
+  const drawTableRow = (cols,vals,ys,bg="#ffffff") => {
+    rect(ctx,0,ys,W,34,bg);
+    line(ctx,0,ys+34,W,ys+34,"#f1f5f9");
+    let cx=8;
+    cols.forEach(([_,w,align],i)=>{
+      const v=vals[i]||"";
+      const col = v._col||"#1e293b";
+      const txt = v._txt||String(v);
+      tf(ctx,txt,align==="right"?cx+w-4:cx,ys+22,11,v._bold?"700":"500",col,align==="right"?"right":"left",w-8);
+      cx+=w;
+    });
+    return ys+34;
+  };
+
+  if((level==="rsm"||!level) && asmRows.length>0) {
+    rect(ctx,0,y,W,20,"#f8fafc");
+    tf(ctx,"ASM-wise Breakdown",8,y+14,10,"800","#94a3b8");
+    y+=20;
+    const cols=[["ASM",220],["Planned",80,"right"],["Issued",80,"right"],["Pending",80,"right"],["Gift Amt",130,"right"],["ROI",110,"right"]];
+    y = drawTableHeader(cols,y);
+    asmRows.forEach((r,i)=>{
+      y = drawTableRow(cols,[
+        {_txt:r.asm,_bold:true},
+        {_txt:String(r.planned),_col:"#1e3a5f",_bold:true},
+        {_txt:String(r.issued),_col:"#16a34a",_bold:true},
+        {_txt:String(r.pending),_col:"#d97706",_bold:true},
+        {_txt:fmtN(r.planAmt),_col:"#7c3aed",_bold:true},
+        {_txt:r.roi?r.roi+"x "+r.roiLbl:"—",_col:r.roiCol,_bold:true},
+      ],y,i%2===1?"#f8fafc":"#ffffff");
+    });
+    y+=4;
+  }
+
+  if(level==="asm" && hqRows.length>0) {
+    rect(ctx,0,y,W,20,"#f8fafc");
+    tf(ctx,"HQ-wise Breakdown",8,y+14,10,"800","#94a3b8");
+    y+=20;
+    const cols=[["HQ",220],["Planned",90,"right"],["Issued",90,"right"],["Pending",90,"right"],["Gift Amt",150,"right"],["Act Sales",160,"right"]];
+    y = drawTableHeader(cols,y);
+    hqRows.forEach((r,i)=>{
+      y = drawTableRow(cols,[
+        {_txt:r.hq,_bold:true},
+        {_txt:String(r.planned),_col:"#1e3a5f",_bold:true},
+        {_txt:String(r.issued),_col:"#16a34a",_bold:true},
+        {_txt:String(r.pending),_col:"#d97706",_bold:true},
+        {_txt:fmtN(r.planAmt),_col:"#7c3aed",_bold:true},
+        {_txt:fmtN(r.actSales),_col:"#0369a1",_bold:true},
+      ],y,i%2===1?"#f8fafc":"#ffffff");
+    });
+    y+=4;
+  }
+
+  if(level==="hq" && doctorRows.length>0) {
+    rect(ctx,0,y,W,20,"#f8fafc");
+    tf(ctx,"Doctor-wise Gift Details",8,y+14,10,"800","#94a3b8");
+    y+=20;
+    const cols=[["Doctor",200],["Gift",230],["Month",100],["MRP",100,"right"],["Status",120],["Act Sales",150,"right"]];
+    y = drawTableHeader(cols,y);
+    doctorRows.forEach((r,i)=>{
+      y = drawTableRow(cols,[
+        {_txt:r.name,_bold:true},
+        {_txt:r.gift},
+        {_txt:r.month,_col:"#64748b"},
+        {_txt:fmtN(r.mrp),_col:"#7c3aed",_bold:true},
+        {_txt:r.status,_col:r.status.includes("Issued")?"#16a34a":"#d97706",_bold:true},
+        {_txt:r.actSales>0?fmtN(r.actSales):"—",_col:"#0369a1",_bold:true},
+      ],y,i%2===1?"#f8fafc":"#ffffff");
+    });
+    y+=4;
+  }
+
+  if(level==="pending" && pending.length>0) {
+    rect(ctx,0,y,W,20,"#fffbeb");
+    tf(ctx,"Pending Gift Entries",8,y+14,10,"800","#92400e");
+    y+=20;
+    const cols=[["Doctor",200],["Gift",230],["ASM",150],["HQ",160],["Month",100],["MRP",60,"right"]];
+    y = drawTableHeader(cols,y);
+    pending.slice(0,12).forEach((g,i)=>{
+      y = drawTableRow(cols,[
+        {_txt:g.doctorName,_bold:true},
+        {_txt:g.giftName},
+        {_txt:g.asmName||"—",_col:"#64748b"},
+        {_txt:g.hqName||"—",_col:"#64748b"},
+        {_txt:g.month,_col:"#64748b"},
+        {_txt:fmtN(g.giftMrp),_col:"#4338ca",_bold:true},
+      ],y,i%2===1?"#f8fafc":"#ffffff");
+    });
+    if(pending.length>12){
+      rect(ctx,0,y,W,24,"#f8fafc");
+      tf(ctx,"+ "+(pending.length-12)+" more pending entries…",W/2,y+17,10,"600","#94a3b8","center");
+      y+=24;
+    }
+    y+=4;
+  }
+
+  // ── FOOTER ──
+  if(pending.length>0 && level!=="pending") {
+    rect(ctx,0,y,W,34,"#fffbeb");
+    line(ctx,0,y,W,y,"#fde68a");
+    tf(ctx,"⏳  "+pending.length+" gifts pending actual entry",14,y+22,11,"700","#92400e");
+    const chips = ASM_LIST.map(a=>{const n=pending.filter(g=>g.asmName===a).length;return n>0?a+": "+n:null;}).filter(Boolean).join("   ");
+    tf(ctx,chips,W-14,y+22,10,"600","#b45309","right");
+    y+=34;
+  }
+  rect(ctx,0,y,W,36,"#ffffff");
+  line(ctx,0,y,W,y,"#e2e8f0");
+  tf(ctx,"GiftTrack v1.3  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+22,9,"600","#94a3b8","center");
+  y+=36;
+
+  // ── Export ──
+  const finalCanvas = document.createElement("canvas");
+  finalCanvas.width = W*2; finalCanvas.height = y*2;
+  const fCtx = finalCanvas.getContext("2d");
+  fCtx.drawImage(canvas,0,0,W*2,y*2,0,0,W*2,y*2);
+
+  const dataUrl = finalCanvas.toDataURL("image/png");
+  const fname = "GiftTrack_"+title.replace(/[^a-z0-9]/gi,"_")+".png";
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if(isIOS){
+    const win=window.open("","_blank");
+    win.document.write(`<html><body style="margin:0;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:16px"><img src="${dataUrl}" style="max-width:100%;border-radius:8px"><p style="color:rgba(255,255,255,0.4);font-family:sans-serif;text-align:center;font-size:12px;margin-top:12px">Long press → Save to Photos or Share</p></body></html>`);
+  } else {
+    const a=document.createElement("a");
+    a.href=dataUrl; a.download=fname; a.click();
   }
 }
+
 
 /* ══════════════════════════════════
    MAIN APP
