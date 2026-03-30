@@ -124,6 +124,7 @@ const SEED_STATE = {
   products: SEED_PRODUCTS,
   doctors: [],
   gifts: [],
+  giftItems: [],
 };
 
 /* ══════════════════════════════════
@@ -132,7 +133,7 @@ const SEED_STATE = {
 const BG = () => ({
   // Plan
   region: "", area: "", asmName: "", hqName: "", doctorName: "", speciality: "", location: "",
-  month: CUR_MONTH, productName: "", giftName: "", giftMrp: "",
+  month: CUR_MONTH, productName: "", giftName: "", giftMrp: "", giftPhotoUrl: "",
   crmType: "CRM", // CRM | Non-CRM
   planSales: [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
   // Actual
@@ -253,7 +254,7 @@ function Confirm({ open, msg, onOk, onCancel }) {
 /* ══════════════════════════════════
    GIFT FORM MODAL
 ══════════════════════════════════ */
-function GiftModal({ open, onClose, onSave, initial, products, doctors }) {
+function GiftModal({ open, onClose, onSave, initial, products, doctors, giftItems }) {
   const [form, setForm] = useState(BG());
   const [tab, setTab] = useState("plan");
   const fileRef = useRef();
@@ -337,8 +338,46 @@ function GiftModal({ open, onClose, onSave, initial, products, doctors }) {
                   <option>CRM</option><option>Non-CRM</option>
                 </select>
               </Fld>
-              <Fld label="Gift Name *" half><input value={form.giftName} onChange={e=>set("giftName",e.target.value)} className="inp" placeholder="Gift item description"/></Fld>
+              {/* Gift from master or manual */}
+              <div className="col-span-2">
+                <div className="section-label">Gift Name *</div>
+                {(giftItems||[]).length > 0 && (
+                  <div style={{marginBottom:8}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"#94a3b8",marginBottom:6}}>📋 PICK FROM MASTER</div>
+                    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                      {(giftItems||[]).map(gi=>(
+                        <button key={gi.id} type="button"
+                          onClick={()=>{ set("giftName",gi.name); set("giftMrp",gi.mrp); set("giftPhotoUrl",gi.photoUrl||""); }}
+                          style={{
+                            display:"flex",alignItems:"center",gap:8,padding:"6px 12px",border:"1.5px solid",
+                            borderColor: form.giftName===gi.name ? "#2563eb" : "#e2e8f0",
+                            background: form.giftName===gi.name ? "#eff6ff" : "white",
+                            borderRadius:10,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"
+                          }}>
+                          {gi.photoUrl && <img src={gi.photoUrl} alt="" style={{width:24,height:24,borderRadius:4,objectFit:"cover"}}/>}
+                          {!gi.photoUrl && <span style={{fontSize:16}}>🎁</span>}
+                          <div style={{textAlign:"left"}}>
+                            <div style={{fontSize:12,fontWeight:700,color:"#1e293b"}}>{gi.name}</div>
+                            <div style={{fontSize:10,color:"#2563eb",fontWeight:800}}>₹{Number(gi.mrp).toLocaleString("en-IN")}</div>
+                          </div>
+                          {form.giftName===gi.name && <span style={{color:"#2563eb",fontSize:14}}>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{fontSize:10,color:"#cbd5e1",marginTop:6}}>— or type manually below —</div>
+                  </div>
+                )}
+                <input value={form.giftName} onChange={e=>set("giftName",e.target.value)} className="inp" placeholder="Gift item name (type or pick above)"/>
+              </div>
               <Fld label="Gift MRP (₹) *" half><input type="number" value={form.giftMrp} onChange={e=>set("giftMrp",e.target.value)} className="inp mono" placeholder="0.00"/></Fld>
+              <Fld label="Gift Photo (from master)" half>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  {form.giftPhotoUrl
+                    ? <img src={form.giftPhotoUrl} alt="gift" style={{width:40,height:40,objectFit:"cover",borderRadius:8,border:"1.5px solid #e2e8f0"}}/>
+                    : <span style={{fontSize:28}}>🎁</span>}
+                  <span style={{fontSize:11,color:"#94a3b8"}}>{form.giftPhotoUrl?"Photo from master":"No photo (pick from master)"}</span>
+                </div>
+              </Fld>
               {/* Expected Sales */}
               <div className="col-span-2">
                 <SalesRows rows={form.planSales} onChange={v=>set("planSales",v)} products={products} label="💰 Expected Sales"/>
@@ -441,6 +480,126 @@ function ProductModal({ open, onClose, onSave, initial }) {
   );
 }
 
+
+/* ══════════════════════════════════
+   GIFT ITEM MODAL (Gift Master add/edit)
+══════════════════════════════════ */
+function GiftItemModal({ open, onClose, onSave, initial }) {
+  const [form, setForm] = useState({ name:"", mrp:"", month:"", photoUrl:"", notes:"" });
+  const fileRef = useRef();
+  useEffect(() => { if (open) setForm(initial || { name:"", mrp:"", month:"", photoUrl:"", notes:"" }); }, [open, initial]);
+  if (!open) return null;
+  const set = (k,v) => setForm(f=>({...f,[k]:v}));
+  const handlePhoto = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => set("photoUrl", ev.target.result);
+    reader.readAsDataURL(file);
+  };
+  return (
+    <div className="modal-overlay">
+      <div className="modal-box" style={{maxWidth:420}}>
+        <div className="flex justify-between items-center px-5 pt-5 pb-4 border-b border-gray-100">
+          <h2 className="font-black text-gray-800">{initial?.id ? "✏️ Edit Gift Item" : "🎁 Add Gift Item"}</h2>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-700 font-bold text-xl">✕</button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div><div className="section-label">Gift Name *</div><input value={form.name} onChange={e=>set("name",e.target.value)} className="inp" placeholder="e.g. Diary, Pen Set, Stethoscope" autoFocus/></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><div className="section-label">MRP (₹) *</div><input type="number" value={form.mrp} onChange={e=>set("mrp",e.target.value)} className="inp mono" placeholder="0.00"/></div>
+            <div><div className="section-label">Month</div><input value={form.month} onChange={e=>set("month",e.target.value)} className="inp" placeholder="e.g. Apr 2026"/></div>
+          </div>
+          <div><div className="section-label">Notes / Description</div><input value={form.notes} onChange={e=>set("notes",e.target.value)} className="inp" placeholder="Optional details…"/></div>
+          <div>
+            <div className="section-label">Gift Photo</div>
+            <div className="flex items-center gap-3">
+              <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
+              <button type="button" className="btn btn-ghost text-xs" onClick={()=>fileRef.current.click()}>📷 Upload Photo</button>
+              {form.photoUrl && (
+                <div className="relative">
+                  <img src={form.photoUrl} alt="gift" style={{width:64,height:64,objectFit:"cover",borderRadius:10,border:"2px solid #e2e8f0"}}/>
+                  <button type="button" onClick={()=>set("photoUrl","")} style={{position:"absolute",top:-6,right:-6,background:"#dc2626",color:"white",border:"none",borderRadius:"50%",width:18,height:18,fontSize:10,cursor:"pointer",fontWeight:900}}>✕</button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button className="btn btn-ghost flex-1" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary flex-1" disabled={!form.name||!form.mrp}
+              onClick={()=>{ onSave({...form, mrp:Number(form.mrp), id:initial?.id||uid()}); onClose(); }}>
+              Save Gift Item
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   GIFT MASTER TAB
+══════════════════════════════════ */
+function GiftMaster({ giftItems, onAdd, onEdit, onDelete }) {
+  const [modal, setModal] = useState(false);
+  const [editG, setEditG] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+
+  return (
+    <div>
+      <GiftItemModal open={modal} onClose={()=>{setModal(false);setEditG(null);}} onSave={g=>{ editG?onEdit(g):onAdd(g); }} initial={editG}/>
+      <Confirm open={!!confirm} msg="Delete this gift item from master?" onOk={()=>{onDelete(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <h2 className="font-black text-gray-800 text-base">🎀 Gift Master ({giftItems.length})</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Add gifts here once — reuse them in every gift entry</p>
+        </div>
+        <button className="btn btn-primary text-xs" onClick={()=>{setEditG(null);setModal(true);}}>+ Add Gift Item</button>
+      </div>
+
+      {/* Card grid */}
+      {giftItems.length === 0 ? (
+        <div className="card p-12 text-center">
+          <div style={{fontSize:48,marginBottom:12}}>🎀</div>
+          <p className="font-bold text-gray-400">No gift items yet</p>
+          <p className="text-xs text-gray-300 mt-1">Add gifts to the master list — they'll be available to pick in every gift entry form</p>
+          <button className="btn btn-primary mt-4 text-xs" onClick={()=>setModal(true)}>+ Add First Gift Item</button>
+        </div>
+      ) : (
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:14}}>
+          {giftItems.map(g => (
+            <div key={g.id} className="card" style={{overflow:"hidden",display:"flex",flexDirection:"column"}}>
+              {/* Photo area */}
+              <div style={{height:140,background:"#f8fafc",display:"flex",alignItems:"center",justifyContent:"center",position:"relative",overflow:"hidden"}}>
+                {g.photoUrl
+                  ? <img src={g.photoUrl} alt={g.name} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                  : <span style={{fontSize:48}}>🎁</span>
+                }
+                {g.month && (
+                  <span style={{position:"absolute",top:8,right:8,background:"rgba(30,58,95,0.85)",color:"white",fontSize:9,fontWeight:800,padding:"2px 8px",borderRadius:20,letterSpacing:0.5}}>
+                    {g.month}
+                  </span>
+                )}
+              </div>
+              {/* Info */}
+              <div style={{padding:"12px 14px",flex:1,display:"flex",flexDirection:"column",gap:4}}>
+                <div style={{fontWeight:800,fontSize:14,color:"#1e293b",lineHeight:1.3}}>{g.name}</div>
+                {g.notes && <div style={{fontSize:11,color:"#94a3b8"}}>{g.notes}</div>}
+                <div style={{fontWeight:900,fontSize:16,color:"#2563eb",marginTop:4}} className="mono">₹{Number(g.mrp||0).toLocaleString("en-IN",{minimumFractionDigits:2})}</div>
+              </div>
+              {/* Actions */}
+              <div style={{display:"flex",borderTop:"1px solid #f1f5f9"}}>
+                <button onClick={()=>{setEditG(g);setModal(true);}} style={{flex:1,padding:"9px",background:"none",border:"none",cursor:"pointer",fontSize:13,color:"#64748b",fontWeight:700,fontFamily:"inherit"}} className="hover:bg-blue-50 hover:text-blue-600">✏️ Edit</button>
+                <div style={{width:1,background:"#f1f5f9"}}/>
+                <button onClick={()=>setConfirm(g.id)} style={{flex:1,padding:"9px",background:"none",border:"none",cursor:"pointer",fontSize:13,color:"#94a3b8",fontWeight:700,fontFamily:"inherit"}} className="hover:bg-red-50 hover:text-red-500">🗑️</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ══════════════════════════════════
    DOCTOR MASTER VIEW (auto-generated)
 ══════════════════════════════════ */
@@ -538,7 +697,7 @@ function ProductMaster({ products, onAdd, onEdit, onDelete }) {
 /* ══════════════════════════════════
    GIFTS TABLE
 ══════════════════════════════════ */
-function GiftsTable({ gifts, products, onEdit, onDelete, onIssue }) {
+function GiftsTable({ gifts, products, giftItems, onEdit, onDelete, onIssue }) {
   const [search, setSearch] = useState("");
   const [fMonth, setFMonth] = useState("all");
   const [fArea, setFArea] = useState("all");
@@ -564,7 +723,7 @@ function GiftsTable({ gifts, products, onEdit, onDelete, onIssue }) {
 
   return (
     <div>
-      <GiftModal open={modal} onClose={()=>{setModal(false);setEditG(null);}} onSave={g=>editG?onEdit(g):onIssue(g)} initial={editG} products={products} doctors={gifts}/>
+      <GiftModal open={modal} onClose={()=>{setModal(false);setEditG(null);}} onSave={g=>editG?onEdit(g):onIssue(g)} initial={editG} products={products} doctors={gifts} giftItems={giftItems||[]}/>
       <Confirm open={!!confirm} msg="Delete this gift entry?" onOk={()=>{onDelete(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>
 
       {/* Filters */}
@@ -1185,9 +1344,10 @@ function App() {
         ref.set(SEED_STATE).catch(console.error);
       } else {
         setData({
-          products: toArr(raw.products).filter(Boolean),
-          doctors:  toArr(raw.doctors).filter(Boolean),
-          gifts:    toArr(raw.gifts).filter(Boolean),
+          products:  toArr(raw.products).filter(Boolean),
+          doctors:   toArr(raw.doctors).filter(Boolean),
+          gifts:     toArr(raw.gifts).filter(Boolean),
+          giftItems: toArr(raw.giftItems).filter(Boolean),
         });
         setLoaded(true);
         setSyncSt("synced");
@@ -1219,6 +1379,11 @@ function App() {
   const editProduct   = p => save({ ...data, products: data.products.map(x => x.id===p.id ? p : x) });
   const deleteProduct = id => save({ ...data, products: data.products.filter(x => x.id!==id) });
 
+  // Gift Items (master)
+  const addGiftItem    = g => { save({ ...data, giftItems: [...(data.giftItems||[]), g] }); notify("Gift item added!"); };
+  const editGiftItem   = g => { save({ ...data, giftItems: (data.giftItems||[]).map(x => x.id===g.id ? g : x) }); notify("Gift item updated!"); };
+  const deleteGiftItem = id => { save({ ...data, giftItems: (data.giftItems||[]).filter(x => x.id!==id) }); notify("Deleted","red"); };
+
   // Gifts
   const saveGift   = g => {
     const exists = data.gifts.find(x => x.id===g.id);
@@ -1246,11 +1411,12 @@ function App() {
   };
 
   const TABS = [
-    { id: "dashboard", label: "Dashboard",    icon: "📊" },
-    { id: "gifts",     label: "Gifts",        icon: "🎁" },
-    { id: "doctors",   label: "Doctors",      icon: "👨‍⚕️" },
-    { id: "products",  label: "Products",     icon: "📦" },
-    { id: "reports",   label: "Reports",      icon: "📋" },
+    { id: "dashboard",   label: "Dashboard",  icon: "📊" },
+    { id: "gifts",       label: "Gifts",      icon: "🎁" },
+    { id: "giftmaster",  label: "Gift Master", icon: "🎀" },
+    { id: "doctors",     label: "Doctors",    icon: "👨‍⚕️" },
+    { id: "products",    label: "Products",   icon: "📦" },
+    { id: "reports",     label: "Reports",    icon: "📋" },
   ];
 
   return (
@@ -1296,9 +1462,10 @@ function App() {
       <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 16px 90px 16px" }}>
         {activeTab === "dashboard" && <Dashboard gifts={data.gifts} onShare={handleShare}/>}
         {activeTab === "gifts" && (
-          <GiftsTable gifts={data.gifts} products={data.products}
+          <GiftsTable gifts={data.gifts} products={data.products} giftItems={data.giftItems||[]}
             onEdit={saveGift} onDelete={deleteGift} onIssue={saveGift}/>
         )}
+        {activeTab === "giftmaster" && <GiftMaster giftItems={data.giftItems||[]} onAdd={addGiftItem} onEdit={editGiftItem} onDelete={deleteGiftItem}/>}
         {activeTab === "doctors" && <DoctorMaster gifts={data.gifts}/>}
         {activeTab === "products" && (
           <ProductMaster products={data.products}
