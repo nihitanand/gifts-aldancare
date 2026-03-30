@@ -54,8 +54,14 @@
     .planned-chip { background: #dbeafe; color: #1e40af; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { animation: spin 1s linear infinite; display: inline-block; }
+    .mobile-bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top: 1.5px solid #e2e8f0; box-shadow: 0 -4px 24px rgba(0,0,0,0.10); z-index: 41; padding-bottom: env(safe-area-inset-bottom,0px); }
+    @media (max-width: 640px) {
+      .mobile-bottom-nav { display: flex !important; }
+      .desktop-nav { display: none !important; }
+    }
     @media print {
       .no-print { display: none !important; }
+      .mobile-bottom-nav { display: none !important; }
       body { background: white; }
       .card { box-shadow: none; border: 1px solid #e2e8f0; }
     }
@@ -1240,11 +1246,11 @@ function App() {
   };
 
   const TABS = [
-    { id: "dashboard", label: "📊 Dashboard" },
-    { id: "gifts",     label: "🎁 Gift Entries" },
-    { id: "doctors",   label: "👨‍⚕️ Doctors" },
-    { id: "products",  label: "📦 Products" },
-    { id: "reports",   label: "📋 Reports" },
+    { id: "dashboard", label: "Dashboard",    icon: "📊" },
+    { id: "gifts",     label: "Gifts",        icon: "🎁" },
+    { id: "doctors",   label: "Doctors",      icon: "👨‍⚕️" },
+    { id: "products",  label: "Products",     icon: "📦" },
+    { id: "reports",   label: "Reports",      icon: "📋" },
   ];
 
   return (
@@ -1252,54 +1258,71 @@ function App() {
       <Toast {...(toast || {})} />
       <Confirm open={!!confirm} msg={confirm?.msg} onOk={confirm?.onOk} onCancel={() => setConfirm(null)} />
 
-      {/* ── NAV ── */}
+      {/* ── TOP NAV (desktop only) ── */}
       <nav style={{ background: "linear-gradient(135deg,#0f172a,#1e3a5f)", color: "white", position: "sticky", top: 0, zIndex: 40, boxShadow: "0 2px 20px rgba(0,0,0,0.2)" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 56 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 24 }}>
+          {/* Logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 24, flexShrink: 0 }}>
             <span style={{ fontSize: 22 }}>🎁</span>
             <div>
               <div style={{ fontWeight: 900, fontSize: 16, lineHeight: 1.1 }}>GiftTrack</div>
               <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 2 }}>Aldan Healthcare</div>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 4, flex: 1, overflowX: "auto" }}>
+          {/* Desktop tabs — hidden on mobile */}
+          <div style={{ display: "flex", gap: 4, flex: 1 }} className="desktop-nav">
             {TABS.map(t => (
               <button key={t.id} onClick={() => setActiveTab(t.id)} className="nav-item"
                 style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif",
-                  background: activeTab===t.id ? "rgba(255,255,255,0.15)" : "transparent",
+                  background: activeTab===t.id ? "rgba(255,255,255,0.18)" : "transparent",
                   color: activeTab===t.id ? "white" : "rgba(255,255,255,0.55)" }}>
-                {t.label}
+                {t.icon} {t.label}
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 12 }}>
+          {/* Status badge */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
             {sharing && <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "4px 10px", borderRadius: 20, fontWeight: 700 }} className="spin">⟳</span>}
-            <span style={{ fontSize: 10, padding: "4px 10px", borderRadius: 20, fontWeight: 700,
+            <span style={{ fontSize: 10, padding: "4px 10px", borderRadius: 20, fontWeight: 700, flexShrink: 0,
               background: syncSt==="synced" ? "rgba(16,185,129,0.2)" : syncSt==="saving" ? "rgba(245,158,11,0.2)" : "rgba(239,68,68,0.2)",
               color: syncSt==="synced" ? "#34d399" : syncSt==="saving" ? "#fbbf24" : "#f87171" }}>
-              {syncSt==="synced" ? "● Live" : syncSt==="saving" ? "⟳ Saving" : "✕ Error"}
+              {syncSt==="synced" ? "● Live" : syncSt==="saving" ? "⟳" : "✕"}
             </span>
           </div>
         </div>
       </nav>
 
       {/* ── CONTENT ── */}
-      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 20px" }}>
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "20px 16px 90px 16px" }}>
         {activeTab === "dashboard" && <Dashboard gifts={data.gifts} onShare={handleShare}/>}
-
         {activeTab === "gifts" && (
           <GiftsTable gifts={data.gifts} products={data.products}
             onEdit={saveGift} onDelete={deleteGift} onIssue={saveGift}/>
         )}
-
         {activeTab === "doctors" && <DoctorMaster gifts={data.gifts}/>}
-
         {activeTab === "products" && (
           <ProductMaster products={data.products}
             onAdd={addProduct} onEdit={editProduct} onDelete={deleteProduct}/>
         )}
-
         {activeTab === "reports" && <Reports gifts={data.gifts} products={data.products}/>}
+      </div>
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <div className="mobile-bottom-nav">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)}
+            style={{
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+              gap: 3, border: "none", background: "none", cursor: "pointer", padding: "8px 4px",
+              fontFamily: "'DM Sans', sans-serif",
+              color: activeTab===t.id ? "#2563eb" : "#94a3b8",
+              transition: "color 0.15s",
+            }}>
+            <span style={{ fontSize: 20, lineHeight: 1 }}>{t.icon}</span>
+            <span style={{ fontSize: 10, fontWeight: activeTab===t.id ? 800 : 600, letterSpacing: 0.2 }}>{t.label}</span>
+            {activeTab===t.id && <div style={{ width: 20, height: 3, borderRadius: 2, background: "#2563eb", marginTop: 1 }}/>}
+          </button>
+        ))}
       </div>
     </div>
   );
