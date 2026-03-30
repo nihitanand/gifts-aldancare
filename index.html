@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎁 GiftTrack – Aldan Healthcare</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'DM Sans', sans-serif; background: #f0f4f8; }
+    .mono { font-family: 'DM Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f0f4f8; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .nav-item { transition: all 0.15s; }
+    .nav-item.active { background: linear-gradient(135deg, #1e3a5f, #2563eb); color: white; }
+    .nav-item:not(.active):hover { background: rgba(37,99,235,0.08); color: #1e3a5f; }
+    .card { background: white; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04); }
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .tbl th { background: #1e3a5f; color: white; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+    .tbl td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; vertical-align: middle; }
+    .tbl tr:hover td { background: #f8fafc; }
+    .tbl tfoot td { background: #e8edf5; font-weight: 800; border-top: 2px solid #2563eb; }
+    .inp { width: 100%; padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s; background: white; }
+    .inp:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .btn { padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 700; border: none; cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+    .btn-primary { background: linear-gradient(135deg,#1e3a5f,#2563eb); color: white; }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+    .btn-danger { background: #fee2e2; color: #dc2626; }
+    .btn-danger:hover { background: #fecaca; }
+    .btn-ghost { background: #f1f5f9; color: #475569; }
+    .btn-ghost:hover { background: #e2e8f0; }
+    .stat-card { border-radius: 14px; padding: 16px; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 20px; overflow-y: auto; backdrop-filter: blur(2px); }
+    .modal-box { background: white; border-radius: 20px; width: 100%; max-width: 620px; margin: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-box.wide { max-width: 860px; }
+    .section-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; margin-bottom: 8px; }
+    .tab-btn { padding: 8px 16px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+    .tab-btn.active { background: white; color: #1e3a5f; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .tab-btn:not(.active) { background: transparent; color: #64748b; }
+    .tab-btn:not(.active):hover { color: #1e3a5f; }
+    .roi-good { color: #059669; font-weight: 800; }
+    .roi-bad { color: #dc2626; font-weight: 800; }
+    .pending-chip { background: #fef3c7; color: #92400e; }
+    .issued-chip { background: #d1fae5; color: #065f46; }
+    .planned-chip { background: #dbeafe; color: #1e40af; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white; }
+      .card { box-shadow: none; border: 1px solid #e2e8f0; }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+/* ── Firebase ── */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBJcohYrAYOMn-C_qdbPXMwOeMyGy8Sw1M",
+  authDomain: "fintech-nd.firebaseapp.com",
+  databaseURL: "https://fintech-nd-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "fintech-nd",
+  storageBucket: "fintech-nd.firebasestorage.app",
+  messagingSenderId: "577595905463",
+  appId: "1:577595905463:web:69beb0a824b0d972560432"
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const DB = firebase.database();
+const PATH = "gifttrack/v1";
+
+const { useState, useEffect, useRef, useMemo } = React;
+
+/* ── Helpers ── */
+const uid = () => Math.random().toString(36).slice(2, 10);
+const fmt = n => "₹" + Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtN = n => Number(n || 0).toLocaleString("en-IN");
+const today = () => new Date().toISOString().split("T")[0];
+const toArr = v => {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.filter(Boolean);
+  if (typeof v === "object") return Object.values(v).filter(Boolean);
+  return [];
+};
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const CUR_MONTH = MONTHS[new Date().getMonth()] + " " + new Date().getFullYear();
+
+/* ── Seed Product Master from PDF ── */
+const SEED_PRODUCTS = [
+  { id: uid(), name: "ALDOVA Tabs", pack: "KIT", pts: 447.41, ptr: 497.13, mrp: 637.00 },
+  { id: uid(), name: "ALDOVA-DS Tabs", pack: "KIT", pts: 546.25, ptr: 606.95, mrp: 778.00 },
+  { id: uid(), name: "MYOLIFE Tabs", pack: "1 X 10", pts: 178.25, ptr: 198.05, mrp: 254.00 },
+  { id: uid(), name: "MYOLIFE PLUS Tabs", pack: "1 X 10", pts: 230.78, ptr: 256.42, mrp: 329.00 },
+  { id: uid(), name: "MYO GDM Tabs (349)", pack: "1 X 10", pts: 218.27, ptr: 242.53, mrp: 311.00 },
+  { id: uid(), name: "MYO GDM Tabs (369)", pack: "1 X 10", pts: 230.78, ptr: 256.42, mrp: 329.00 },
+  { id: uid(), name: "ALDANVIT Tabs", pack: "1 X 10", pts: 111.95, ptr: 124.39, mrp: 160.00 },
+  { id: uid(), name: "LOQ 10 Plus Caps", pack: "1 X 10", pts: 362.12, ptr: 402.36, mrp: 516.00 },
+  { id: uid(), name: "LACORIA Caps", pack: "1 X 14", pts: 303.33, ptr: 337.03, mrp: 432.00 },
+  { id: uid(), name: "OSTEOFEM Tabs (520)", pack: "1 X 10", pts: 325.22, ptr: 361.36, mrp: 463.00 },
+  { id: uid(), name: "OSTEOFEM Tabs (550)", pack: "1 X 10", pts: 343.98, ptr: 382.20, mrp: 490.00 },
+  { id: uid(), name: "UTILAC Caps", pack: "1 X 10", pts: 224.53, ptr: 249.47, mrp: 320.00 },
+  { id: uid(), name: "OVALUX Caps", pack: "1 X 10", pts: 856.21, ptr: 951.34, mrp: 1219.00 },
+  { id: uid(), name: "ARGILUX Sachets", pack: "1 X 20", pts: 687.97, ptr: 764.41, mrp: 979.00 },
+];
+
+const SEED_STATE = {
+  products: SEED_PRODUCTS,
+  doctors: [],
+  gifts: [],
+};
+
+/* ══════════════════════════════════
+   GIFT FORM DEFAULTS
+══════════════════════════════════ */
+const BG = () => ({
+  // Plan
+  region: "", area: "", asmName: "", hqName: "", doctorName: "", speciality: "", location: "",
+  month: CUR_MONTH, productName: "", giftName: "", giftMrp: "",
+  crmType: "CRM", // CRM | Non-CRM
+  planSales: [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
+  // Actual
+  issued: false,
+  issueDate: "",
+  photoUrl: "",
+  actualSales: [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
+  // Meta
+  id: null, createdAt: new Date().toISOString(),
+});
+
+/* ══════════════════════════════════
+   INLINE FIELD LABEL
+══════════════════════════════════ */
+function Fld({ label, children, half, third }) {
+  return (
+    <div className={half ? "col-span-1" : third ? "col-span-1" : "col-span-2"}>
+      <div className="section-label">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   SALES ROWS COMPONENT
+══════════════════════════════════ */
+function SalesRows({ rows, onChange, products, label }) {
+  const update = (idx, field, val) => {
+    const next = rows.map((r, i) => {
+      if (i !== idx) return r;
+      const updated = { ...r, [field]: val };
+      if (field === "qty" || field === "ptr") {
+        updated.amt = (Number(updated.qty || 0) * Number(updated.ptr || 0)).toFixed(2);
+      }
+      if (field === "prod") {
+        const p = products.find(p => p.name === val);
+        if (p) { updated.ptr = p.ptr; updated.amt = (Number(updated.qty || 0) * p.ptr).toFixed(2); }
+      }
+      return updated;
+    });
+    onChange(next);
+  };
+  const add = () => onChange([...rows, { id: uid(), prod: "", qty: "", ptr: "", amt: "" }]);
+  const rem = idx => onChange(rows.filter((_, i) => i !== idx));
+  const total = rows.reduce((s, r) => s + Number(r.amt || 0), 0);
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-2">
+        <div className="section-label">{label}</div>
+        <button type="button" onClick={add} className="text-xs font-bold text-blue-600 hover:text-blue-800">+ Add Row</button>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-gray-100">
+        <table className="w-full text-xs tbl">
+          <thead><tr>
+            <th>Product</th><th>Qty</th><th>PTR (₹)</th><th>Amt (₹)</th><th></th>
+          </tr></thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.id}>
+                <td>
+                  <select value={r.prod} onChange={e => update(i, "prod", e.target.value)} className="inp" style={{ padding: "5px 8px", fontSize: 12 }}>
+                    <option value="">— Product —</option>
+                    {products.map(p => <option key={p.id}>{p.name}</option>)}
+                    <option value="Other">Other</option>
+                  </select>
+                </td>
+                <td><input type="number" value={r.qty} onChange={e => update(i, "qty", e.target.value)} className="inp" style={{ padding: "5px 8px", fontSize: 12, width: 70 }} placeholder="0"/></td>
+                <td><input type="number" value={r.ptr} onChange={e => update(i, "ptr", e.target.value)} className="inp" style={{ padding: "5px 8px", fontSize: 12, width: 90 }} placeholder="0.00"/></td>
+                <td className="mono font-bold text-indigo-700">{r.amt ? fmt(r.amt) : "—"}</td>
+                <td>{rows.length > 1 && <button type="button" onClick={() => rem(i)} className="text-red-300 hover:text-red-600 text-xs">✕</button>}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr>
+            <td colSpan={3} className="text-right font-black">Total</td>
+            <td className="font-black mono text-indigo-800">{fmt(total)}</td>
+            <td></td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   TOAST
+══════════════════════════════════ */
+function Toast({ msg, color }) {
+  if (!msg) return null;
+  const bg = color === "red" ? "#dc2626" : color === "amber" ? "#d97706" : "#059669";
+  return (
+    <div style={{ position: "fixed", top: 16, right: 16, zIndex: 9999, background: bg, color: "white", padding: "10px 20px", borderRadius: 12, fontWeight: 700, fontSize: 13, boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
+      {msg}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   CONFIRM DIALOG
+══════════════════════════════════ */
+function Confirm({ open, msg, onOk, onCancel }) {
+  if (!open) return null;
+  return (
+    <div className="modal-overlay">
+      <div className="modal-box" style={{ maxWidth: 380, padding: 28 }}>
+        <div className="text-3xl text-center mb-3">⚠️</div>
+        <p className="text-center font-semibold text-gray-700 mb-5">{msg}</p>
+        <div className="flex gap-3">
+          <button className="btn btn-ghost flex-1" onClick={onCancel}>Cancel</button>
+          <button className="btn btn-danger flex-1" onClick={onOk}>Delete</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   GIFT FORM MODAL
+══════════════════════════════════ */
+function GiftModal({ open, onClose, onSave, initial, products, doctors }) {
+  const [form, setForm] = useState(BG());
+  const [tab, setTab] = useState("plan");
+  const fileRef = useRef();
+
+  useEffect(() => {
+    if (open) {
+      setForm(initial ? { ...BG(), ...initial } : BG());
+      setTab("plan");
+    }
+  }, [open, initial]);
+
+  if (!open) return null;
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const specialities = ["Gynecologist", "Obstetrician", "Endocrinologist", "General Physician", "Infertility Specialist", "Diabetologist", "Other"];
+  const giftMrp = Number(form.giftMrp || 0);
+  const actualTotal = form.actualSales.reduce((s, r) => s + Number(r.amt || 0), 0);
+  const roi = giftMrp > 0 && actualTotal > 0 ? (actualTotal / giftMrp).toFixed(2) : null;
+
+  const handlePhoto = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => set("photoUrl", ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = () => {
+    if (!form.doctorName || !form.giftName || !form.giftMrp || !form.month) return;
+    onSave({ ...form, id: form.id || uid(), createdAt: form.createdAt || new Date().toISOString() });
+    onClose();
+  };
+
+  // Auto-doctor detect
+  const knownDocs = [...new Set(doctors.map(d => d.name))];
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-box wide">
+        <div className="flex justify-between items-center px-6 pt-5 pb-4 border-b border-gray-100">
+          <h2 className="font-black text-gray-800 text-base">{form.id ? "✏️ Edit Gift Entry" : "🎁 New Gift Entry"}</h2>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-700 text-xl font-bold">✕</button>
+        </div>
+        <div className="flex gap-1 p-4 pb-0 bg-gray-50 border-b border-gray-100">
+          {[["plan","📋 Gift Plan"],["actual","✅ Gift Actual"]].map(([t,l])=>(
+            <button key={t} className={`tab-btn ${tab===t?"active":""}`} onClick={()=>setTab(t)}>{l}</button>
+          ))}
+        </div>
+        <div className="p-6 overflow-y-auto" style={{ maxHeight: "70vh" }}>
+          {tab === "plan" && (
+            <div className="grid grid-cols-2 gap-4">
+              {/* Row 1 */}
+              <Fld label="Region *" half><input value={form.region} onChange={e=>set("region",e.target.value)} className="inp" placeholder="e.g. East"/></Fld>
+              <Fld label="Area *" half><input value={form.area} onChange={e=>set("area",e.target.value)} className="inp" placeholder="e.g. Bihar"/></Fld>
+              <Fld label="ASM Name *" half><input value={form.asmName} onChange={e=>set("asmName",e.target.value)} className="inp" placeholder="Area Sales Manager"/></Fld>
+              <Fld label="HQ Name *" half><input value={form.hqName} onChange={e=>set("hqName",e.target.value)} className="inp" placeholder="Headquarter name"/></Fld>
+              {/* Row 2 */}
+              <Fld label="Doctor Name *" half>
+                <input list="doc-list" value={form.doctorName} onChange={e=>set("doctorName",e.target.value)} className="inp" placeholder="Dr. Name"/>
+                <datalist id="doc-list">{knownDocs.map(d=><option key={d} value={d}/>)}</datalist>
+              </Fld>
+              <Fld label="Speciality" half>
+                <select value={form.speciality} onChange={e=>set("speciality",e.target.value)} className="inp">
+                  <option value="">— Select —</option>
+                  {specialities.map(s=><option key={s}>{s}</option>)}
+                </select>
+              </Fld>
+              <Fld label="Location" half><input value={form.location} onChange={e=>set("location",e.target.value)} className="inp" placeholder="City / Town"/></Fld>
+              <Fld label="Month" half>
+                <input value={form.month} onChange={e=>set("month",e.target.value)} className="inp" placeholder="e.g. Apr 2026"/>
+              </Fld>
+              {/* Row 3 */}
+              <Fld label="Promoted Product" half>
+                <select value={form.productName} onChange={e=>set("productName",e.target.value)} className="inp">
+                  <option value="">— Select Product —</option>
+                  {products.map(p=><option key={p.id}>{p.name}</option>)}
+                </select>
+              </Fld>
+              <Fld label="CRM / Non-CRM" half>
+                <select value={form.crmType} onChange={e=>set("crmType",e.target.value)} className="inp">
+                  <option>CRM</option><option>Non-CRM</option>
+                </select>
+              </Fld>
+              <Fld label="Gift Name *" half><input value={form.giftName} onChange={e=>set("giftName",e.target.value)} className="inp" placeholder="Gift item description"/></Fld>
+              <Fld label="Gift MRP (₹) *" half><input type="number" value={form.giftMrp} onChange={e=>set("giftMrp",e.target.value)} className="inp mono" placeholder="0.00"/></Fld>
+              {/* Expected Sales */}
+              <div className="col-span-2">
+                <SalesRows rows={form.planSales} onChange={v=>set("planSales",v)} products={products} label="💰 Expected Sales"/>
+              </div>
+            </div>
+          )}
+          {tab === "actual" && (
+            <div className="space-y-5">
+              <div className="bg-blue-50 rounded-xl p-4 grid grid-cols-2 gap-3 text-sm">
+                <div><span className="text-gray-400 font-semibold">Doctor:</span> <strong>{form.doctorName||"—"}</strong></div>
+                <div><span className="text-gray-400 font-semibold">Gift:</span> <strong>{form.giftName||"—"}</strong> {form.giftMrp?<span className="text-indigo-700 font-bold">({fmt(form.giftMrp)})</span>:""}</div>
+                <div><span className="text-gray-400 font-semibold">HQ:</span> <strong>{form.hqName||"—"}</strong></div>
+                <div><span className="text-gray-400 font-semibold">Month:</span> <strong>{form.month||"—"}</strong></div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="section-label">Gift Issued?</div>
+                  <div className="flex gap-3">
+                    {[["Yes",true],["No",false]].map(([l,v])=>(
+                      <label key={l} className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" checked={form.issued===v} onChange={()=>set("issued",v)} className="w-4 h-4 accent-blue-600"/>
+                        <span className="text-sm font-semibold">{l}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {form.issued && (
+                  <div>
+                    <div className="section-label">Date of Issue</div>
+                    <input type="date" value={form.issueDate} onChange={e=>set("issueDate",e.target.value)} className="inp"/>
+                  </div>
+                )}
+              </div>
+
+              {form.issued && (
+                <>
+                  <div>
+                    <div className="section-label">Gift Photo</div>
+                    <div className="flex items-center gap-3">
+                      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={handlePhoto}/>
+                      <button type="button" className="btn btn-ghost text-xs" onClick={()=>fileRef.current.click()}>📷 Upload Photo</button>
+                      {form.photoUrl && <img src={form.photoUrl} alt="gift" style={{width:60,height:60,objectFit:"cover",borderRadius:8,border:"2px solid #e2e8f0"}}/>}
+                      {form.photoUrl && <button type="button" className="text-xs text-red-400 hover:text-red-600" onClick={()=>set("photoUrl","")}>Remove</button>}
+                    </div>
+                  </div>
+                  <SalesRows rows={form.actualSales} onChange={v=>set("actualSales",v)} products={products} label="📈 Actual Sales"/>
+                  {roi && (
+                    <div className={`rounded-xl p-4 text-center font-black text-2xl ${Number(roi)>=1?"bg-emerald-50 text-emerald-700":"bg-red-50 text-red-600"}`}>
+                      ROI: {roi}x &nbsp;<span className="text-sm font-semibold">{Number(roi)>=1?"✅ Positive":"⚠️ Below Target"}</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-3 p-5 border-t border-gray-100">
+          <button className="btn btn-ghost flex-1" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary flex-1" onClick={handleSave}
+            disabled={!form.doctorName||!form.giftName||!form.giftMrp}>
+            {form.id ? "Update Entry" : "Save Gift Entry"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   PRODUCT MODAL
+══════════════════════════════════ */
+function ProductModal({ open, onClose, onSave, initial }) {
+  const [form, setForm] = useState({ name:"", pack:"", pts:"", ptr:"", mrp:"" });
+  useEffect(() => { if (open) setForm(initial || { name:"", pack:"", pts:"", ptr:"", mrp:"" }); }, [open, initial]);
+  if (!open) return null;
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  return (
+    <div className="modal-overlay">
+      <div className="modal-box" style={{ maxWidth: 420 }}>
+        <div className="flex justify-between items-center px-5 pt-5 pb-4 border-b border-gray-100">
+          <h2 className="font-black text-gray-800">{initial?.id ? "Edit Product" : "Add Product"}</h2>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-700 font-bold text-xl">✕</button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div><div className="section-label">Product Name *</div><input value={form.name} onChange={e=>set("name",e.target.value)} className="inp" placeholder="e.g. MYOLIFE Tabs"/></div>
+          <div><div className="section-label">Pack Size</div><input value={form.pack} onChange={e=>set("pack",e.target.value)} className="inp" placeholder="e.g. 1 X 10"/></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div><div className="section-label">PTS (₹)</div><input type="number" value={form.pts} onChange={e=>set("pts",e.target.value)} className="inp mono" placeholder="0.00"/></div>
+            <div><div className="section-label">PTR (₹)</div><input type="number" value={form.ptr} onChange={e=>set("ptr",e.target.value)} className="inp mono" placeholder="0.00"/></div>
+            <div><div className="section-label">MRP (₹)</div><input type="number" value={form.mrp} onChange={e=>set("mrp",e.target.value)} className="inp mono" placeholder="0.00"/></div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button className="btn btn-ghost flex-1" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary flex-1" onClick={()=>{ if(!form.name) return; onSave({...form,id:initial?.id||uid()}); onClose(); }}>Save Product</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   DOCTOR MASTER VIEW (auto-generated)
+══════════════════════════════════ */
+function DoctorMaster({ gifts }) {
+  const docMap = {};
+  gifts.forEach(g => {
+    const key = g.doctorName;
+    if (!key) return;
+    if (!docMap[key]) docMap[key] = { name: key, speciality: g.speciality, location: g.location, hq: g.hqName, area: g.area, gifts: 0, lastGift: "" };
+    docMap[key].gifts++;
+    if (!docMap[key].lastGift || g.createdAt > docMap[key].lastGift) docMap[key].lastGift = g.month;
+  });
+  const docs = Object.values(docMap).sort((a, b) => a.name.localeCompare(b.name));
+
+  return (
+    <div className="card p-5">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="font-black text-gray-800 text-base">👨‍⚕️ Doctor Master ({docs.length})</h2>
+        <span className="text-xs text-gray-400">Auto-generated from gift entries</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full tbl">
+          <thead><tr>
+            <th>#</th><th>Doctor Name</th><th>Speciality</th><th>Location</th><th>HQ</th><th>Area</th><th>Gifts</th><th>Last Month</th>
+          </tr></thead>
+          <tbody>
+            {docs.map((d, i) => (
+              <tr key={d.name}>
+                <td className="text-gray-400 text-xs">{i+1}</td>
+                <td className="font-bold">{d.name}</td>
+                <td><span className="badge bg-blue-100 text-blue-700">{d.speciality||"—"}</span></td>
+                <td>{d.location||"—"}</td>
+                <td>{d.hq||"—"}</td>
+                <td>{d.area||"—"}</td>
+                <td className="font-bold text-indigo-700">{d.gifts}</td>
+                <td className="text-gray-400 text-xs">{d.lastGift||"—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {docs.length===0 && <div className="text-center py-10 text-gray-300 text-sm">No doctors yet — add gift entries</div>}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   PRODUCT MASTER TAB
+══════════════════════════════════ */
+function ProductMaster({ products, onAdd, onEdit, onDelete }) {
+  const [modal, setModal] = useState(false);
+  const [editP, setEditP] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+
+  return (
+    <div>
+      <ProductModal open={modal} onClose={()=>{setModal(false);setEditP(null);}} onSave={p=>{editP?onEdit(p):onAdd(p);}} initial={editP}/>
+      <Confirm open={!!confirm} msg="Delete this product?" onOk={()=>{onDelete(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>
+      <div className="card p-5">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="font-black text-gray-800">📦 Product Master ({products.length})</h2>
+          <button className="btn btn-primary text-xs" onClick={()=>setModal(true)}>+ Add Product</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full tbl">
+            <thead><tr>
+              <th>#</th><th>Product Name</th><th>Pack Size</th><th>PTS (₹)</th><th>PTR (₹)</th><th>MRP (₹)</th><th></th>
+            </tr></thead>
+            <tbody>
+              {products.map((p, i) => (
+                <tr key={p.id}>
+                  <td className="text-gray-400 text-xs">{i+1}</td>
+                  <td className="font-bold">{p.name}</td>
+                  <td><span className="badge bg-gray-100 text-gray-600">{p.pack}</span></td>
+                  <td className="mono text-blue-700">{fmt(p.pts)}</td>
+                  <td className="mono text-indigo-700">{fmt(p.ptr)}</td>
+                  <td className="mono font-bold">{fmt(p.mrp)}</td>
+                  <td>
+                    <div className="flex gap-2">
+                      <button onClick={()=>{setEditP(p);setModal(true);}} className="text-blue-300 hover:text-blue-600 text-sm">✏️</button>
+                      <button onClick={()=>setConfirm(p.id)} className="text-gray-200 hover:text-red-500 text-sm">🗑️</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {products.length===0 && <div className="text-center py-10 text-gray-300 text-sm">No products yet</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   GIFTS TABLE
+══════════════════════════════════ */
+function GiftsTable({ gifts, products, onEdit, onDelete, onIssue }) {
+  const [search, setSearch] = useState("");
+  const [fMonth, setFMonth] = useState("all");
+  const [fArea, setFArea] = useState("all");
+  const [fStatus, setFStatus] = useState("all");
+  const [modal, setModal] = useState(false);
+  const [editG, setEditG] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+
+  const months = [...new Set(gifts.map(g=>g.month).filter(Boolean))].sort();
+  const areas  = [...new Set(gifts.map(g=>g.area).filter(Boolean))].sort();
+
+  const filtered = gifts.filter(g => {
+    if (fMonth !== "all" && g.month !== fMonth) return false;
+    if (fArea !== "all" && g.area !== fArea) return false;
+    if (fStatus === "pending" && g.issued) return false;
+    if (fStatus === "issued" && !g.issued) return false;
+    if (search && !`${g.doctorName} ${g.hqName} ${g.asmName} ${g.giftName}`.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const planTotal = filtered.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+  const actTotal  = filtered.filter(g=>g.issued).reduce((s,g)=>s+Number(g.giftMrp||0),0);
+
+  return (
+    <div>
+      <GiftModal open={modal} onClose={()=>{setModal(false);setEditG(null);}} onSave={g=>editG?onEdit(g):onIssue(g)} initial={editG} products={products} doctors={gifts}/>
+      <Confirm open={!!confirm} msg="Delete this gift entry?" onOk={()=>{onDelete(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <input value={search} onChange={e=>setSearch(e.target.value)} className="inp" style={{maxWidth:220}} placeholder="🔍 Search..."/>
+        <select value={fMonth} onChange={e=>setFMonth(e.target.value)} className="inp" style={{maxWidth:160}}>
+          <option value="all">All Months</option>
+          {months.map(m=><option key={m}>{m}</option>)}
+        </select>
+        <select value={fArea} onChange={e=>setFArea(e.target.value)} className="inp" style={{maxWidth:160}}>
+          <option value="all">All Areas</option>
+          {areas.map(a=><option key={a}>{a}</option>)}
+        </select>
+        <select value={fStatus} onChange={e=>setFStatus(e.target.value)} className="inp" style={{maxWidth:160}}>
+          <option value="all">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="issued">Issued</option>
+        </select>
+        <div className="flex-1"/>
+        <button className="btn btn-primary text-xs" onClick={()=>{setEditG(null);setModal(true);}}>🎁 + New Gift Entry</button>
+      </div>
+
+      {/* Summary strip */}
+      <div className="grid grid-cols-4 gap-3 mb-4">
+        {[
+          {label:"Total Planned",val:filtered.length,color:"#dbeafe",tc:"#1e40af"},
+          {label:"Issued",val:filtered.filter(g=>g.issued).length,color:"#d1fae5",tc:"#065f46"},
+          {label:"Pending",val:filtered.filter(g=>!g.issued).length,color:"#fef3c7",tc:"#92400e"},
+          {label:"Gift Value (Plan)",val:fmt(planTotal),color:"#ede9fe",tc:"#5b21b6"},
+        ].map(s=>(
+          <div key={s.label} style={{background:s.color,borderRadius:12,padding:"12px 16px"}}>
+            <div className="section-label" style={{color:s.tc}}>{s.label}</div>
+            <div className="font-black text-xl" style={{color:s.tc}}>{s.val}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full tbl">
+            <thead><tr>
+              <th>#</th><th>Month</th><th>Area/HQ</th><th>ASM</th><th>Doctor</th><th>Gift</th><th>MRP</th><th>CRM</th><th>Plan Sales</th><th>Status</th><th>Actual Sales</th><th>ROI</th><th></th>
+            </tr></thead>
+            <tbody>
+              {filtered.map((g, i) => {
+                const planAmt = g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+                const actAmt  = g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+                const roi = g.issued && Number(g.giftMrp)>0 && actAmt>0 ? (actAmt/Number(g.giftMrp)).toFixed(2) : null;
+                return (
+                  <tr key={g.id}>
+                    <td className="text-gray-400 text-xs">{i+1}</td>
+                    <td className="text-xs font-semibold text-gray-600">{g.month}</td>
+                    <td><div className="font-semibold text-gray-800 text-xs">{g.area}</div><div className="text-gray-400 text-xs">{g.hqName}</div></td>
+                    <td className="text-xs">{g.asmName}</td>
+                    <td>
+                      <div className="font-semibold">{g.doctorName}</div>
+                      <div className="text-gray-400 text-xs">{g.speciality}</div>
+                    </td>
+                    <td>
+                      <div className="font-semibold text-xs">{g.giftName}</div>
+                      {g.productName && <div className="text-xs text-indigo-500">{g.productName}</div>}
+                      {g.photoUrl && g.issued && <img src={g.photoUrl} alt="gift" style={{width:32,height:32,objectFit:"cover",borderRadius:6,marginTop:3,border:"1px solid #e2e8f0"}} onClick={()=>window.open(g.photoUrl,"_blank")} className="cursor-pointer"/>}
+                    </td>
+                    <td className="mono font-bold text-indigo-700">{fmt(g.giftMrp)}</td>
+                    <td><span className={`badge ${g.crmType==="CRM"?"bg-blue-100 text-blue-700":"bg-gray-100 text-gray-600"}`}>{g.crmType}</span></td>
+                    <td className="mono text-xs">{planAmt>0?fmt(planAmt):"—"}</td>
+                    <td>
+                      {g.issued
+                        ? <span className="badge issued-chip">✓ Issued{g.issueDate?` ${g.issueDate}`:""}</span>
+                        : <span className="badge pending-chip">⏳ Pending</span>}
+                    </td>
+                    <td className="mono text-xs">{g.issued&&actAmt>0?fmt(actAmt):"—"}</td>
+                    <td className={roi?Number(roi)>=1?"roi-good":"roi-bad":"text-gray-300 text-xs"}>{roi?`${roi}x`:"—"}</td>
+                    <td>
+                      <div className="flex gap-1">
+                        <button onClick={()=>{setEditG(g);setModal(true);}} className="text-blue-300 hover:text-blue-600">✏️</button>
+                        <button onClick={()=>setConfirm(g.id)} className="text-gray-200 hover:text-red-500">🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {filtered.length===0 && <div className="text-center py-12 text-gray-300 text-sm">No gift entries found</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   DASHBOARD
+══════════════════════════════════ */
+function Dashboard({ gifts, onShare }) {
+  const [selMonth, setSelMonth] = useState("all");
+  const months = [...new Set(gifts.map(g=>g.month).filter(Boolean))].sort();
+
+  const fGifts = selMonth==="all" ? gifts : gifts.filter(g=>g.month===selMonth);
+
+  // Region → Area → HQ rollup
+  const regionMap = {};
+  fGifts.forEach(g => {
+    const reg = g.region||"(No Region)";
+    const area = g.area||"(No Area)";
+    const hq = g.hqName||"(No HQ)";
+    if (!regionMap[reg]) regionMap[reg] = {};
+    if (!regionMap[reg][area]) regionMap[reg][area] = {};
+    if (!regionMap[reg][area][hq]) regionMap[reg][area][hq] = { gifts:[], planned:0, issued:0, planAmt:0, actAmt:0, planSales:0, actSales:0 };
+    const entry = regionMap[reg][area][hq];
+    entry.gifts.push(g);
+    entry.planned++;
+    entry.planAmt += Number(g.giftMrp||0);
+    entry.planSales += g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+    if (g.issued) {
+      entry.issued++;
+      entry.actAmt += Number(g.giftMrp||0);
+      entry.actSales += g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+    }
+  });
+
+  // Pending
+  const pending = fGifts.filter(g=>!g.issued);
+  const pendingByArea = {};
+  pending.forEach(g=>{
+    const area = g.area||"(No Area)";
+    if (!pendingByArea[area]) pendingByArea[area] = { count:0, hqs:{} };
+    pendingByArea[area].count++;
+    const hq = g.hqName||"(No HQ)";
+    if (!pendingByArea[area].hqs[hq]) pendingByArea[area].hqs[hq] = 0;
+    pendingByArea[area].hqs[hq]++;
+  });
+
+  // Overall totals
+  const totals = fGifts.reduce((acc,g)=>{
+    acc.planned++;
+    acc.planAmt += Number(g.giftMrp||0);
+    acc.planSales += g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+    if (g.issued) {
+      acc.issued++;
+      acc.actAmt += Number(g.giftMrp||0);
+      acc.actSales += g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+    }
+    return acc;
+  }, { planned:0, issued:0, planAmt:0, actAmt:0, planSales:0, actSales:0 });
+  const overallROI = totals.actAmt>0&&totals.actSales>0 ? (totals.actSales/totals.actAmt).toFixed(2) : null;
+
+  const [expanded, setExpanded] = useState({});
+  const toggle = k => setExpanded(e=>({...e,[k]:!e[k]}));
+
+  return (
+    <div className="space-y-5">
+      {/* Filter & Share */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <select value={selMonth} onChange={e=>setSelMonth(e.target.value)} className="inp" style={{maxWidth:180}}>
+          <option value="all">All Months</option>
+          {months.map(m=><option key={m}>{m}</option>)}
+        </select>
+        <div className="flex-1"/>
+        <button className="btn btn-ghost text-xs" onClick={()=>onShare("dashboard", fGifts, selMonth)}>📤 Share Dashboard</button>
+      </div>
+
+      {/* KPI Strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          {l:"Gifts Planned",v:totals.planned,c:"#dbeafe",tc:"#1d4ed8"},
+          {l:"Gifts Issued",v:totals.issued,c:"#d1fae5",tc:"#065f46"},
+          {l:"Gift Plan Amt",v:fmt(totals.planAmt),c:"#ede9fe",tc:"#5b21b6"},
+          {l:"Gift Actual Amt",v:fmt(totals.actAmt),c:"#fef3c7",tc:"#92400e"},
+          {l:"Planned Sales",v:fmt(totals.planSales),c:"#e0f2fe",tc:"#0369a1"},
+          {l:"Actual Sales",v:fmt(totals.actSales),c:"#dcfce7",tc:"#166534"},
+          {l:"Overall ROI",v:overallROI?`${overallROI}x`:"—",c:overallROI&&Number(overallROI)>=1?"#dcfce7":"#fee2e2",tc:overallROI&&Number(overallROI)>=1?"#166534":"#991b1b"},
+          {l:"Pending",v:totals.planned-totals.issued,c:"#fff7ed",tc:"#c2410c"},
+        ].map(s=>(
+          <div key={s.l} style={{background:s.c,borderRadius:14,padding:"14px 16px"}}>
+            <div className="section-label" style={{color:s.tc,opacity:.7}}>{s.l}</div>
+            <div className="font-black text-xl mono" style={{color:s.tc}}>{s.v}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Region → Area → HQ Table */}
+      <div className="card p-5">
+        <h3 className="font-black text-gray-800 mb-4">🗺️ Region-wise Summary</h3>
+        <div className="overflow-x-auto">
+          <table className="w-full tbl">
+            <thead><tr>
+              <th>Region / Area / HQ</th><th>Month</th><th>Planned</th><th>Issued</th><th>Plan Amt</th><th>Act Amt</th><th>Plan Sales</th><th>Act Sales</th><th>ROI</th><th></th>
+            </tr></thead>
+            <tbody>
+              {Object.entries(regionMap).map(([reg, areas]) => {
+                const rTot = { planned:0, issued:0, planAmt:0, actAmt:0, planSales:0, actSales:0 };
+                Object.values(areas).forEach(hqs=>Object.values(hqs).forEach(h=>{
+                  rTot.planned+=h.planned; rTot.issued+=h.issued; rTot.planAmt+=h.planAmt;
+                  rTot.actAmt+=h.actAmt; rTot.planSales+=h.planSales; rTot.actSales+=h.actSales;
+                }));
+                const rROI = rTot.actAmt>0&&rTot.actSales>0?(rTot.actSales/rTot.actAmt).toFixed(2):null;
+                const regExpanded = expanded[reg];
+
+                return [
+                  <tr key={reg} style={{background:"#1e3a5f",cursor:"pointer"}} onClick={()=>toggle(reg)}>
+                    <td colSpan={1} style={{color:"white",fontWeight:800,fontSize:13}}>{regExpanded?"▼":"▶"} {reg}</td>
+                    <td style={{color:"rgba(255,255,255,0.6)",fontSize:11}}>{selMonth==="all"?"All":selMonth}</td>
+                    <td style={{color:"#93c5fd",fontWeight:800}}>{rTot.planned}</td>
+                    <td style={{color:"#6ee7b7",fontWeight:800}}>{rTot.issued}</td>
+                    <td style={{color:"#c4b5fd",fontWeight:800}} className="mono">{fmt(rTot.planAmt)}</td>
+                    <td style={{color:"#fcd34d",fontWeight:800}} className="mono">{fmt(rTot.actAmt)}</td>
+                    <td style={{color:"#7dd3fc",fontWeight:800}} className="mono">{fmt(rTot.planSales)}</td>
+                    <td style={{color:"#86efac",fontWeight:800}} className="mono">{fmt(rTot.actSales)}</td>
+                    <td style={{color:rROI&&Number(rROI)>=1?"#86efac":"#fca5a5",fontWeight:800}}>{rROI?`${rROI}x`:"—"}</td>
+                    <td></td>
+                  </tr>,
+                  ...(!regExpanded ? [] : Object.entries(areas).flatMap(([area, hqs]) => {
+                    const aTot = { planned:0, issued:0, planAmt:0, actAmt:0, planSales:0, actSales:0 };
+                    Object.values(hqs).forEach(h=>{ aTot.planned+=h.planned; aTot.issued+=h.issued; aTot.planAmt+=h.planAmt; aTot.actAmt+=h.actAmt; aTot.planSales+=h.planSales; aTot.actSales+=h.actSales; });
+                    const aROI = aTot.actAmt>0&&aTot.actSales>0?(aTot.actSales/aTot.actAmt).toFixed(2):null;
+                    const aKey = `${reg}_${area}`;
+                    const aExpanded = expanded[aKey];
+
+                    return [
+                      <tr key={aKey} style={{background:"#f0f4f8",cursor:"pointer"}} onClick={e=>{e.stopPropagation();toggle(aKey);}}>
+                        <td style={{fontWeight:700,paddingLeft:24}}>{aExpanded?"▼":"▶"} {area}</td>
+                        <td className="text-xs text-gray-400">{selMonth==="all"?"All":selMonth}</td>
+                        <td className="font-bold text-blue-700">{aTot.planned}</td>
+                        <td className="font-bold text-emerald-700">{aTot.issued}</td>
+                        <td className="mono font-bold text-purple-700">{fmt(aTot.planAmt)}</td>
+                        <td className="mono font-bold text-amber-700">{fmt(aTot.actAmt)}</td>
+                        <td className="mono font-bold text-cyan-700">{fmt(aTot.planSales)}</td>
+                        <td className="mono font-bold text-green-700">{fmt(aTot.actSales)}</td>
+                        <td className={aROI?Number(aROI)>=1?"roi-good":"roi-bad":"text-gray-300"}>{aROI?`${aROI}x`:"—"}</td>
+                        <td><button className="text-xs btn btn-ghost py-1 px-2" onClick={e=>{e.stopPropagation();onShare("area",Object.values(hqs).flatMap(h=>h.gifts),area);}}>📤</button></td>
+                      </tr>,
+                      ...(!aExpanded ? [] : Object.entries(hqs).map(([hq, h]) => {
+                        const hROI = h.actAmt>0&&h.actSales>0?(h.actSales/h.actAmt).toFixed(2):null;
+                        return (
+                          <tr key={`${aKey}_${hq}`}>
+                            <td style={{paddingLeft:44}} className="text-sm">{hq}</td>
+                            <td className="text-xs text-gray-400">{selMonth==="all"?"All":selMonth}</td>
+                            <td>{h.planned}</td>
+                            <td className="text-emerald-700">{h.issued}</td>
+                            <td className="mono text-purple-600">{fmt(h.planAmt)}</td>
+                            <td className="mono text-amber-600">{fmt(h.actAmt)}</td>
+                            <td className="mono text-cyan-600">{fmt(h.planSales)}</td>
+                            <td className="mono text-green-600">{fmt(h.actSales)}</td>
+                            <td className={hROI?Number(hROI)>=1?"roi-good":"roi-bad":"text-gray-300"}>{hROI?`${hROI}x`:"—"}</td>
+                            <td><button className="text-xs btn btn-ghost py-1 px-2" onClick={()=>onShare("hq",h.gifts,hq)}>📤</button></td>
+                          </tr>
+                        );
+                      }))
+                    ];
+                  }))
+                ];
+              })}
+            </tbody>
+          </table>
+          {Object.keys(regionMap).length===0 && <div className="text-center py-10 text-gray-300 text-sm">No data yet</div>}
+        </div>
+      </div>
+
+      {/* Pending Entries */}
+      {pending.length > 0 && (
+        <div className="card p-5">
+          <h3 className="font-black text-gray-800 mb-1">⏳ Pending Gift Actual Entries ({pending.length})</h3>
+          <p className="text-xs text-gray-400 mb-4">Gifts planned but not yet confirmed as issued</p>
+          <div className="overflow-x-auto">
+            <table className="w-full tbl">
+              <thead><tr>
+                <th>Area / HQ</th><th>ASM</th><th>Doctor</th><th>Gift</th><th>Month</th><th>Gift MRP</th>
+              </tr></thead>
+              <tbody>
+                {pending.map(g=>(
+                  <tr key={g.id}>
+                    <td><div className="font-semibold text-xs">{g.area}</div><div className="text-gray-400 text-xs">{g.hqName}</div></td>
+                    <td className="text-xs">{g.asmName}</td>
+                    <td className="font-semibold">{g.doctorName}</td>
+                    <td className="text-xs">{g.giftName}</td>
+                    <td><span className="badge planned-chip">{g.month}</span></td>
+                    <td className="mono font-bold text-indigo-700">{fmt(g.giftMrp)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   REPORTS
+══════════════════════════════════ */
+function Reports({ gifts, products }) {
+  const [repType, setRepType] = useState("deviation");
+  const [selMonth, setSelMonth] = useState("all");
+  const [selArea, setSelArea] = useState("all");
+  const [selHQ, setSelHQ] = useState("all");
+  const [inclPlan, setInclPlan] = useState(true);
+  const [inclActual, setInclActual] = useState(true);
+  const [inclProdDet, setInclProdDet] = useState(false);
+  const [groupBy, setGroupBy] = useState("area");
+
+  const months = [...new Set(gifts.map(g=>g.month).filter(Boolean))].sort();
+  const areas  = [...new Set(gifts.map(g=>g.area).filter(Boolean))].sort();
+  const hqs    = [...new Set(gifts.map(g=>g.hqName).filter(Boolean))].sort();
+
+  let filtered = gifts;
+  if (selMonth !== "all") filtered = filtered.filter(g=>g.month===selMonth);
+  if (selArea !== "all")  filtered = filtered.filter(g=>g.area===selArea);
+  if (selHQ !== "all")    filtered = filtered.filter(g=>g.hqName===selHQ);
+
+  const generateHTML = () => {
+    const css = `body{font-family:'DM Sans',Arial,sans-serif;font-size:13px;color:#1f2937;padding:24px;}h1{font-size:18px;font-weight:800;color:#1e3a5f;border-bottom:2px solid #2563eb;padding-bottom:8px;margin-bottom:4px;}h2{font-size:14px;font-weight:700;color:#374151;margin:16px 0 6px;border-left:3px solid #2563eb;padding-left:8px;}table{width:100%;border-collapse:collapse;font-size:12px;}th{background:#1e3a5f;color:white;padding:7px 10px;text-align:left;font-size:11px;text-transform:uppercase;}td{padding:6px 10px;border-bottom:1px solid #f0f0f0;}tr:nth-child(even) td{background:#f9fafb;}.tf td{background:#e8edf5;font-weight:800;border-top:2px solid #2563eb;}.g{color:#059669;font-weight:700}.r{color:#dc2626;font-weight:700}.meta{font-size:11px;color:#6b7280;margin-bottom:16px}.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}.issued{background:#d1fae5;color:#065f46}.pending{background:#fef3c7;color:#92400e}@media print{@page{margin:15mm;size:A4}}`;
+
+    let body = `<h1>🎁 GiftTrack – Aldan Healthcare</h1>
+    <div class="meta">Report: <strong>${repType.toUpperCase()}</strong> | Month: ${selMonth==="all"?"All":selMonth} | Area: ${selArea==="all"?"All":selArea} | Generated: ${new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</div>`;
+
+    if (repType === "deviation") {
+      body += `<h2>Gift Planned vs Actual Deviation</h2>
+      <table><thead><tr>
+        <th>Month</th><th>Area</th><th>HQ</th><th>ASM</th><th>Doctor</th><th>Gift</th><th>Gift MRP</th><th>Plan Sales</th><th>Status</th><th>Act Sales</th><th>ROI</th><th>Deviation</th>
+      </tr></thead><tbody>`;
+      filtered.forEach(g => {
+        const planSales = g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+        const actSales  = g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+        const roi = g.issued&&Number(g.giftMrp)>0&&actSales>0?(actSales/Number(g.giftMrp)).toFixed(2):null;
+        const dev = g.issued ? actSales - planSales : null;
+        body += `<tr>
+          <td>${g.month||"—"}</td><td>${g.area||"—"}</td><td>${g.hqName||"—"}</td><td>${g.asmName||"—"}</td>
+          <td><strong>${g.doctorName}</strong></td><td>${g.giftName}</td>
+          <td>₹${Number(g.giftMrp||0).toFixed(2)}</td>
+          <td>₹${planSales.toFixed(2)}</td>
+          <td><span class="badge ${g.issued?"issued":"pending"}">${g.issued?"✓ Issued":"⏳ Pending"}</span></td>
+          <td>${actSales>0?"₹"+actSales.toFixed(2):"—"}</td>
+          <td>${roi?`${roi}x`:"—"}</td>
+          <td class="${dev!=null?(dev>=0?"g":"r"):""}">
+            ${dev!=null?(dev>=0?"+":"")+fmt(dev):"—"}
+          </td>
+        </tr>`;
+      });
+      body += "</tbody></table>";
+    }
+
+    if (repType === "summary") {
+      const groups = {};
+      filtered.forEach(g => {
+        const key = groupBy==="region"?g.region:groupBy==="area"?g.area:groupBy==="hq"?g.hqName:g.month;
+        if (!groups[key||"—"]) groups[key||"—"] = [];
+        groups[key||"—"].push(g);
+      });
+      body += `<h2>Area/HQ/Month Gift Summary</h2>`;
+      Object.entries(groups).forEach(([grp, gs]) => {
+        const planned = gs.length;
+        const issued  = gs.filter(g=>g.issued).length;
+        const planAmt = gs.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+        const actAmt  = gs.filter(g=>g.issued).reduce((s,g)=>s+Number(g.giftMrp||0),0);
+        const planSales = gs.reduce((s,g)=>s+(g.planSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0),0);
+        const actSales  = gs.reduce((s,g)=>s+(g.issued?(g.actualSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0):0),0);
+        const roi = actAmt>0&&actSales>0?(actSales/actAmt).toFixed(2):null;
+        body += `<h2>${grp}</h2>
+        <table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>
+          <tr><td>Planned Gifts</td><td><strong>${planned}</strong></td></tr>
+          <tr><td>Issued Gifts</td><td><strong>${issued}</strong></td></tr>
+          <tr><td>Pending</td><td><strong>${planned-issued}</strong></td></tr>
+          <tr><td>Gift Plan Amt</td><td><strong>${fmt(planAmt)}</strong></td></tr>
+          <tr><td>Gift Actual Amt (Issued)</td><td><strong>${fmt(actAmt)}</strong></td></tr>
+          <tr><td>Expected Sales</td><td><strong>${fmt(planSales)}</strong></td></tr>
+          <tr><td>Actual Sales</td><td><strong>${fmt(actSales)}</strong></td></tr>
+          <tr><td>Overall ROI</td><td class="${roi&&Number(roi)>=1?"g":"r"}"><strong>${roi?roi+"x":"—"}</strong></td></tr>
+        </tbody></table>`;
+        if (inclProdDet) {
+          body += `<table style="margin-top:8px"><thead><tr><th>Doctor</th><th>Gift</th><th>MRP</th><th>Status</th><th>ROI</th></tr></thead><tbody>`;
+          gs.forEach(g => {
+            const actSalesG = g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+            const roiG = g.issued&&Number(g.giftMrp)>0&&actSalesG>0?(actSalesG/Number(g.giftMrp)).toFixed(2):null;
+            body += `<tr><td>${g.doctorName}</td><td>${g.giftName}</td><td>${fmt(g.giftMrp)}</td><td><span class="badge ${g.issued?"issued":"pending"}">${g.issued?"✓ Issued":"⏳ Pending"}</span></td><td class="${roiG&&Number(roiG)>=1?"g":"r"}">${roiG?roiG+"x":"—"}</td></tr>`;
+          });
+          body += "</tbody></table>";
+        }
+      });
+    }
+
+    if (repType === "pending") {
+      const pending = filtered.filter(g=>!g.issued);
+      body += `<h2>Pending Gift Actual Entries (${pending.length})</h2>
+      <table><thead><tr><th>Month</th><th>Region</th><th>Area</th><th>HQ</th><th>ASM</th><th>Doctor</th><th>Gift</th><th>Gift MRP</th><th>CRM</th></tr></thead><tbody>`;
+      pending.forEach(g => {
+        body += `<tr><td>${g.month||"—"}</td><td>${g.region||"—"}</td><td>${g.area||"—"}</td><td>${g.hqName||"—"}</td><td>${g.asmName||"—"}</td><td><strong>${g.doctorName}</strong></td><td>${g.giftName}</td><td>${fmt(g.giftMrp)}</td><td>${g.crmType}</td></tr>`;
+      });
+      body += `</tbody><tfoot><tr class="tf"><td colspan="7"><strong>Total Pending</strong></td><td><strong>${fmt(pending.reduce((s,g)=>s+Number(g.giftMrp||0),0))}</strong></td><td></td></tr></tfoot></table>`;
+    }
+
+    body += `<div style="margin-top:32px;font-size:10px;color:#d1d5db;text-align:center;border-top:1px solid #f3f4f6;padding-top:8px">GiftTrack – Aldan Healthcare · Generated ${new Date().toLocaleDateString("en-IN")}</div>`;
+
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>GiftTrack Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700;800&display=swap" rel="stylesheet"/>
+    <style>${css}</style></head><body>
+    <button onclick="window.print()" style="float:right;background:#1e3a5f;color:white;padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;margin-bottom:12px">🖨️ Print / PDF</button>
+    ${body}</body></html>`;
+  };
+
+  const openReport = () => {
+    const win = window.open("", "_blank");
+    win.document.write(generateHTML());
+    win.document.close();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="card p-5">
+        <h2 className="font-black text-gray-800 mb-4">📊 Generate Reports</h2>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div>
+            <div className="section-label">Report Type</div>
+            <select value={repType} onChange={e=>setRepType(e.target.value)} className="inp">
+              <option value="deviation">Gift Plan vs Actual Deviation</option>
+              <option value="summary">Area/HQ/Month Summary</option>
+              <option value="pending">Pending Actual Entry</option>
+            </select>
+          </div>
+          <div>
+            <div className="section-label">Month</div>
+            <select value={selMonth} onChange={e=>setSelMonth(e.target.value)} className="inp">
+              <option value="all">All Months</option>
+              {months.map(m=><option key={m}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <div className="section-label">Area</div>
+            <select value={selArea} onChange={e=>setSelArea(e.target.value)} className="inp">
+              <option value="all">All Areas</option>
+              {areas.map(a=><option key={a}>{a}</option>)}
+            </select>
+          </div>
+          <div>
+            <div className="section-label">HQ</div>
+            <select value={selHQ} onChange={e=>setSelHQ(e.target.value)} className="inp">
+              <option value="all">All HQs</option>
+              {hqs.map(h=><option key={h}>{h}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {repType === "summary" && (
+          <div className="flex gap-4 flex-wrap mb-4">
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="checkbox" checked={inclPlan} onChange={e=>setInclPlan(e.target.checked)} className="w-4 h-4 accent-blue-600"/>
+              Include Gift Plan
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="checkbox" checked={inclActual} onChange={e=>setInclActual(e.target.checked)} className="w-4 h-4 accent-blue-600"/>
+              Include Gift Actual
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-sm">
+              <input type="checkbox" checked={inclProdDet} onChange={e=>setInclProdDet(e.target.checked)} className="w-4 h-4 accent-blue-600"/>
+              Include Product Detail
+            </label>
+            <div>
+              <select value={groupBy} onChange={e=>setGroupBy(e.target.value)} className="inp" style={{maxWidth:160}}>
+                <option value="region">Region-wise</option>
+                <option value="area">Area-wise</option>
+                <option value="hq">HQ-wise</option>
+                <option value="month">Month-wise</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button className="btn btn-primary" onClick={openReport}>📄 Open PDF Report</button>
+          <button className="btn btn-ghost" onClick={()=>{
+            // CSV Export
+            let csv = "Month,Region,Area,HQ,ASM,Doctor,Speciality,Gift,Gift MRP,CRM,Status,Plan Sales,Actual Sales,ROI\n";
+            filtered.forEach(g=>{
+              const ps = g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+              const as = g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+              const roi = g.issued&&Number(g.giftMrp)>0&&as>0?(as/Number(g.giftMrp)).toFixed(2):"";
+              csv += `"${g.month||""}","${g.region||""}","${g.area||""}","${g.hqName||""}","${g.asmName||""}","${g.doctorName||""}","${g.speciality||""}","${g.giftName||""}",${g.giftMrp||0},"${g.crmType||""}","${g.issued?"Issued":"Pending"}",${ps.toFixed(2)},${as.toFixed(2)},"${roi}"\n`;
+            });
+            const blob = new Blob([csv], {type:"text/csv"});
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `GiftTrack_Report_${repType}_${new Date().toISOString().split("T")[0]}.csv`;
+            a.click();
+          }}>📊 Export Excel (CSV)</button>
+        </div>
+      </div>
+
+      {/* Quick preview */}
+      <div className="card p-5">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-black text-gray-800">Quick Preview ({filtered.length} records)</h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full tbl">
+            <thead><tr>
+              <th>Month</th><th>Area</th><th>HQ</th><th>Doctor</th><th>Gift</th><th>MRP</th><th>Status</th><th>Plan Sales</th><th>Act Sales</th><th>ROI</th>
+            </tr></thead>
+            <tbody>
+              {filtered.slice(0,20).map(g=>{
+                const ps = g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+                const as = g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+                const roi = g.issued&&Number(g.giftMrp)>0&&as>0?(as/Number(g.giftMrp)).toFixed(2):null;
+                return (
+                  <tr key={g.id}>
+                    <td className="text-xs">{g.month}</td>
+                    <td className="text-xs">{g.area}</td>
+                    <td className="text-xs">{g.hqName}</td>
+                    <td className="font-semibold">{g.doctorName}</td>
+                    <td className="text-xs">{g.giftName}</td>
+                    <td className="mono text-xs">{fmt(g.giftMrp)}</td>
+                    <td><span className={`badge ${g.issued?"issued-chip":"pending-chip"}`}>{g.issued?"✓ Issued":"⏳"}</span></td>
+                    <td className="mono text-xs">{ps>0?fmt(ps):"—"}</td>
+                    <td className="mono text-xs">{as>0?fmt(as):"—"}</td>
+                    <td className={roi?Number(roi)>=1?"roi-good":"roi-bad":"text-gray-300 text-xs"}>{roi?`${roi}x`:"—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {filtered.length > 20 && <div className="text-center py-3 text-xs text-gray-400">Showing 20 of {filtered.length} records — click Open PDF for full report</div>}
+          {filtered.length === 0 && <div className="text-center py-10 text-gray-300 text-sm">No records match filter</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════
+   SHARE / WHATSAPP CARD GENERATOR
+══════════════════════════════════ */
+async function generateShareCard(gifts, title, subtitle) {
+  const issued = gifts.filter(g=>g.issued);
+  const planAmt = gifts.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+  const actAmt = issued.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+  const planSales = gifts.reduce((s,g)=>s+(g.planSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0),0);
+  const actSales = issued.reduce((s,g)=>s+(g.actualSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0),0);
+  const roi = actAmt>0&&actSales>0?(actSales/actAmt).toFixed(2):null;
+  const pct = gifts.length>0?Math.round(issued.length/gifts.length*100):0;
+
+  const html = `<div id="share-card" style="width:800px;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1e40af 100%);padding:40px;font-family:Arial,sans-serif;color:white;box-sizing:border-box;border-radius:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,0.1)">
+      <div><div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:3px;margin-bottom:6px">🎁 GiftTrack · Aldan Healthcare</div>
+      <div style="font-size:22px;font-weight:900;margin-bottom:4px">${title}</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.4)">${subtitle || new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</div></div>
+      <div style="background:rgba(255,255,255,0.08);border-radius:50px;padding:12px 18px;text-align:center">
+        <div style="font-size:26px;font-weight:900">${pct}%</div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px">issued</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      ${[
+        ["Planned","#60a5fa",gifts.length+" gifts"],
+        ["Issued","#34d399",issued.length+" gifts"],
+        ["Pending","#fbbf24",(gifts.length-issued.length)+" gifts"],
+        ["Gift Plan Amt","#c084fc","₹"+planAmt.toLocaleString("en-IN",{minimumFractionDigits:2})],
+        ["Actual Gift Amt","#f472b6","₹"+actAmt.toLocaleString("en-IN",{minimumFractionDigits:2})],
+        ["Expected Sales","#7dd3fc","₹"+planSales.toLocaleString("en-IN",{minimumFractionDigits:2})],
+        ["Actual Sales","#86efac","₹"+actSales.toLocaleString("en-IN",{minimumFractionDigits:2})],
+        ["Overall ROI",roi&&Number(roi)>=1?"#86efac":"#f87171",roi?roi+"x":"—"],
+      ].map(([l,c,v])=>`<div style="flex:1;min-width:170px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:12px 16px">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.35);margin-bottom:5px">${l}</div>
+        <div style="font-size:18px;font-weight:900;color:${c}">${v}</div>
+      </div>`).join("")}
+    </div>
+    <div style="background:rgba(255,255,255,0.06);border-radius:999px;height:8px;overflow:hidden;margin-bottom:6px">
+      <div style="background:linear-gradient(90deg,#6366f1,#34d399);height:100%;width:${pct}%;border-radius:999px"></div>
+    </div>
+    <div style="font-size:10px;color:rgba(255,255,255,0.2);text-align:center;margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.07)">GiftTrack · gifts.aldancare.com · ${new Date().toLocaleDateString("en-IN")}</div>
+  </div>`;
+
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:fixed;left:-9999px;top:0;z-index:-999";
+  wrap.innerHTML = html;
+  document.body.appendChild(wrap);
+  await new Promise(r => setTimeout(r, 300));
+  try {
+    const card = wrap.querySelector("#share-card");
+    const canvas = await html2canvas(card, { scale: 2, useCORS: true, logging: false, backgroundColor: null });
+    const dataUrl = canvas.toDataURL("image/png");
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      const win = window.open("", "_blank");
+      win.document.write(`<html><body style="margin:0;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:16px"><img src="${dataUrl}" style="max-width:100%;border-radius:12px"><p style="color:rgba(255,255,255,0.4);font-family:sans-serif;text-align:center;font-size:12px;margin-top:12px">Long press → Save to Photos or Share</p></body></html>`);
+    } else {
+      const a = document.createElement("a");
+      a.href = dataUrl; a.download = `GiftTrack_${title.replace(/[^a-z0-9]/gi,"_")}.png`; a.click();
+    }
+  } finally {
+    document.body.removeChild(wrap);
+  }
+}
+
+/* ══════════════════════════════════
+   MAIN APP
+══════════════════════════════════ */
+function App() {
+  const [data, setData] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [syncSt, setSyncSt] = useState("connecting");
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [toast, setToast] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+  const [sharing, setSharing] = useState(false);
+
+  const notify = (msg, color="green") => {
+    setToast({ msg, color });
+    setTimeout(() => setToast(null), 2800);
+  };
+
+  /* ── Firebase ── */
+  useEffect(() => {
+    const ref = DB.ref(PATH);
+    ref.on("value", snap => {
+      const raw = snap.val();
+      if (raw === null) {
+        ref.set(SEED_STATE).catch(console.error);
+      } else {
+        setData({
+          products: toArr(raw.products).filter(Boolean),
+          doctors:  toArr(raw.doctors).filter(Boolean),
+          gifts:    toArr(raw.gifts).filter(Boolean),
+        });
+        setLoaded(true);
+        setSyncSt("synced");
+      }
+    }, err => { console.error(err); setSyncSt("error"); setLoaded(true); });
+    return () => ref.off();
+  }, []);
+
+  const save = (next) => {
+    setSyncSt("saving");
+    DB.ref(PATH).set(next)
+      .then(() => setSyncSt("synced"))
+      .catch(e => { console.error(e); setSyncSt("error"); });
+  };
+
+  if (!data) {
+    if (!loaded) return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, background: "#f0f4f8" }}>
+        <div style={{ fontSize: 48 }} className="spin">🎁</div>
+        <p style={{ fontWeight: 800, color: "#1e3a5f", fontSize: 18 }}>Loading GiftTrack…</p>
+      </div>
+    );
+    return null;
+  }
+
+  /* ── CRUD ── */
+  // Products
+  const addProduct    = p => save({ ...data, products: [...data.products, p] });
+  const editProduct   = p => save({ ...data, products: data.products.map(x => x.id===p.id ? p : x) });
+  const deleteProduct = id => save({ ...data, products: data.products.filter(x => x.id!==id) });
+
+  // Gifts
+  const saveGift   = g => {
+    const exists = data.gifts.find(x => x.id===g.id);
+    const nextGifts = exists ? data.gifts.map(x => x.id===g.id ? g : x) : [...data.gifts, g];
+    save({ ...data, gifts: nextGifts });
+    notify(exists ? "Gift entry updated!" : "Gift entry saved!");
+  };
+  const deleteGift = id => {
+    save({ ...data, gifts: data.gifts.filter(x => x.id!==id) });
+    notify("Deleted", "red");
+  };
+
+  const handleShare = async (type, gifts, label) => {
+    setSharing(true);
+    notify("Generating image…", "amber");
+    try {
+      await generateShareCard(gifts, label || "Gift Summary", type === "dashboard" ? "Full Dashboard" : `${type} Report`);
+      notify("✅ Image ready!");
+    } catch (e) {
+      console.error(e);
+      notify("Image failed", "red");
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const TABS = [
+    { id: "dashboard", label: "📊 Dashboard" },
+    { id: "gifts",     label: "🎁 Gift Entries" },
+    { id: "doctors",   label: "👨‍⚕️ Doctors" },
+    { id: "products",  label: "📦 Products" },
+    { id: "reports",   label: "📋 Reports" },
+  ];
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f0f4f8" }}>
+      <Toast {...(toast || {})} />
+      <Confirm open={!!confirm} msg={confirm?.msg} onOk={confirm?.onOk} onCancel={() => setConfirm(null)} />
+
+      {/* ── NAV ── */}
+      <nav style={{ background: "linear-gradient(135deg,#0f172a,#1e3a5f)", color: "white", position: "sticky", top: 0, zIndex: 40, boxShadow: "0 2px 20px rgba(0,0,0,0.2)" }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", height: 56 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: 24 }}>
+            <span style={{ fontSize: 22 }}>🎁</span>
+            <div>
+              <div style={{ fontWeight: 900, fontSize: 16, lineHeight: 1.1 }}>GiftTrack</div>
+              <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: 2 }}>Aldan Healthcare</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 4, flex: 1, overflowX: "auto" }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setActiveTab(t.id)} className="nav-item"
+                style={{ padding: "6px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", fontFamily: "'DM Sans', sans-serif",
+                  background: activeTab===t.id ? "rgba(255,255,255,0.15)" : "transparent",
+                  color: activeTab===t.id ? "white" : "rgba(255,255,255,0.55)" }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 12 }}>
+            {sharing && <span style={{ fontSize: 11, background: "rgba(255,255,255,0.15)", padding: "4px 10px", borderRadius: 20, fontWeight: 700 }} className="spin">⟳</span>}
+            <span style={{ fontSize: 10, padding: "4px 10px", borderRadius: 20, fontWeight: 700,
+              background: syncSt==="synced" ? "rgba(16,185,129,0.2)" : syncSt==="saving" ? "rgba(245,158,11,0.2)" : "rgba(239,68,68,0.2)",
+              color: syncSt==="synced" ? "#34d399" : syncSt==="saving" ? "#fbbf24" : "#f87171" }}>
+              {syncSt==="synced" ? "● Live" : syncSt==="saving" ? "⟳ Saving" : "✕ Error"}
+            </span>
+          </div>
+        </div>
+      </nav>
+
+      {/* ── CONTENT ── */}
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "24px 20px" }}>
+        {activeTab === "dashboard" && <Dashboard gifts={data.gifts} onShare={handleShare}/>}
+
+        {activeTab === "gifts" && (
+          <GiftsTable gifts={data.gifts} products={data.products}
+            onEdit={saveGift} onDelete={deleteGift} onIssue={saveGift}/>
+        )}
+
+        {activeTab === "doctors" && <DoctorMaster gifts={data.gifts}/>}
+
+        {activeTab === "products" && (
+          <ProductMaster products={data.products}
+            onAdd={addProduct} onEdit={editProduct} onDelete={deleteProduct}/>
+        )}
+
+        {activeTab === "reports" && <Reports gifts={data.gifts} products={data.products}/>}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
