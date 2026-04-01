@@ -112,6 +112,20 @@ const HQ_LIST = ["Patna-1 (Raj Pd)","Patna-2 (Hemant)","Patna-3 (Mrityunjay)","S
 const ASM_LIST = ["Patna ASM","Darbhanga ASM","Saharsa ASM"];
 const REGION_FIXED = "RSM Bihar";
 
+/* ── Gift-only ROI for CRM vs Non-CRM ── */
+const calcRoi = (g) => {
+  const mrp = Number(g.giftMrp||0);
+  if (!mrp) return null;
+  let actSalesVal = 0;
+  if (g.crmType === "CRM") {
+    actSalesVal = (g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
+  } else {
+    actSalesVal = (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
+  }
+  if (!actSalesVal) return null;
+  return (actSalesVal / mrp).toFixed(2);
+};
+
 /* ── ROI Classification ── */
 const roiClass = (roi) => {
   const r = Number(roi);
@@ -158,15 +172,19 @@ const SEED_STATE = {
 ══════════════════════════════════ */
 const BG = () => ({
   // Plan
-  region: "", area: "", asmName: "", hqName: "", doctorName: "", speciality: "", location: "",
-  month: CUR_MONTH, productName: "", giftName: "", giftMrp: "", giftPhotoUrl: "",
-  crmType: "CRM", // CRM | Non-CRM
-  planSales: [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
+  asmName: "", hqName: "", doctorName: "", doctorMobile: "", speciality: "", location: "",
+  month: CUR_MONTH, giftName: "", giftMrp: "", giftPhotoUrl: "",
+  crmType: "CRM",
+  planSales:     [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
+  crmPlanSales:  [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
+  giftPlanSales: [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
   // Actual
   issued: false,
   issueDate: "",
-  photoUrl: "",
-  actualSales: [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
+  issuedPhotoUrl: "",
+  actualSales:     [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
+  crmActualSales:  [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
+  giftActualSales: [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
   // Meta
   id: null, createdAt: new Date().toISOString(),
 });
@@ -359,8 +377,7 @@ function GiftModal({ open, onClose, onSave, initial, products, doctors, gifts, g
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const specialities = ["Gynecologist", "Obstetrician", "Endocrinologist", "General Physician", "Infertility Specialist", "Diabetologist", "Other"];
   const giftMrp = Number(form.giftMrp || 0);
-  const actualTotal = form.actualSales.reduce((s, r) => s + Number(r.amt || 0), 0);
-  const roi = giftMrp > 0 && actualTotal > 0 ? (actualTotal / giftMrp).toFixed(2) : null;
+  const roi = calcRoi(form);
 
 
 
@@ -483,9 +500,19 @@ function GiftModal({ open, onClose, onSave, initial, products, doctors, gifts, g
                 </div>
                 {form.giftPhotoUrl && <img src={form.giftPhotoUrl} alt="gift" style={{width:40,height:40,objectFit:"cover",borderRadius:8,border:"1.5px solid #e2e8f0",marginTop:6}}/>}
               </div>
-              {/* Expected Sales */}
+              {/* Expected Sales — CRM shows two tables */}
               <div className="col-span-2">
-                <SalesRows rows={form.planSales} onChange={v=>set("planSales",v)} products={products} label="💰 Expected Sales"/>
+                {form.crmType === "CRM" ? (
+                  <div className="space-y-3">
+                    <div style={{background:"#eff6ff",borderRadius:10,padding:"8px 12px",fontSize:11,color:"#1e40af",fontWeight:700}}>
+                      ℹ️ CRM Doctor — capture CRM sales (company investment) and Gift sales (your investment) separately. ROI is calculated on Gift Sales ÷ Gift MRP only.
+                    </div>
+                    <SalesRows rows={form.crmPlanSales||[{id:uid(),prod:"",qty:"",ptr:"",amt:""}]} onChange={v=>set("crmPlanSales",v)} products={products} label="📊 CRM Expected Sales (Company Investment)"/>
+                    <SalesRows rows={form.giftPlanSales||[{id:uid(),prod:"",qty:"",ptr:"",amt:""}]} onChange={v=>set("giftPlanSales",v)} products={products} label="🎁 Gift Expected Sales (Gift Investment)"/>
+                  </div>
+                ) : (
+                  <SalesRows rows={form.planSales} onChange={v=>set("planSales",v)} products={products} label="💰 Expected Sales"/>
+                )}
               </div>
             </div>
           )}
@@ -531,32 +558,82 @@ function GiftModal({ open, onClose, onSave, initial, products, doctors, gifts, g
                   {form.issuedPhotoUrl && <button type="button" className="text-xs text-red-400" onClick={()=>set("issuedPhotoUrl","")}>Remove</button>}
                 </div>
               </div>
-              {/* Actual Sales with Copy from Plan */}
-              <div>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <div className="section-label" style={{marginBottom:0}}>📈 Actual Sales</div>
-                  {form.planSales&&form.planSales.some(r=>r.prod) && (
-                    <button type="button"
-                      onClick={()=>set("actualSales", form.planSales.map(r=>({...r, id:uid()})))}
-                      style={{fontSize:11,fontWeight:800,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"inherit"}}>
-                      📋 Copy from Plan
-                    </button>
-                  )}
-                </div>
-                {/* Planned sales reference */}
-                {form.planSales&&form.planSales.some(r=>r.prod) && (
-                  <div style={{background:"#f8fafc",borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:11}}>
-                    <div style={{fontWeight:700,color:"#94a3b8",marginBottom:4,textTransform:"uppercase",letterSpacing:0.5}}>📌 Planned (reference)</div>
-                    {form.planSales.filter(r=>r.prod).map((r,i)=>(
-                      <div key={i} style={{display:"flex",justifyContent:"space-between",color:"#64748b",padding:"2px 0",borderBottom:"1px dashed #e2e8f0"}}>
-                        <span>{r.prod}</span>
-                        <span style={{fontWeight:700}}>Qty:{r.qty||0} × ₹{r.ptr||0} = <strong style={{color:"#4338ca"}}>{fmt(r.amt||0)}</strong></span>
+              {/* Actual Sales with Copy from Plan — CRM split */}
+              {form.crmType === "CRM" ? (
+                <div className="space-y-3">
+                  {/* CRM Actual Sales */}
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <div className="section-label" style={{marginBottom:0}}>📊 CRM Achieved Sales</div>
+                      {(form.crmPlanSales||[]).some(r=>r.prod) && (
+                        <button type="button" onClick={()=>set("crmActualSales",(form.crmPlanSales||[]).map(r=>({...r,id:uid()})))}
+                          style={{fontSize:11,fontWeight:800,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit"}}>
+                          📋 Copy from Plan
+                        </button>
+                      )}
+                    </div>
+                    {(form.crmPlanSales||[]).some(r=>r.prod) && (
+                      <div style={{background:"#f8fafc",borderRadius:8,padding:"6px 10px",marginBottom:6,fontSize:11}}>
+                        <div style={{fontWeight:700,color:"#94a3b8",marginBottom:3}}>📌 CRM Planned</div>
+                        {(form.crmPlanSales||[]).filter(r=>r.prod).map((r,i)=>(
+                          <div key={i} style={{display:"flex",justifyContent:"space-between",color:"#64748b",padding:"1px 0"}}>
+                            <span>{r.prod}</span><span style={{fontWeight:700}}>×{r.qty||0} = {fmt(r.amt||0)}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+                    <SalesRows rows={form.crmActualSales||[{id:uid(),prod:"",qty:"",ptr:"",amt:""}]} onChange={v=>set("crmActualSales",v)} products={products} label=""/>
                   </div>
-                )}
-                <SalesRows rows={form.actualSales} onChange={v=>set("actualSales",v)} products={products} label=""/>
-              </div>
+                  {/* Gift Actual Sales */}
+                  <div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <div className="section-label" style={{marginBottom:0}}>🎁 Gift Achieved Sales <span style={{fontSize:9,color:"#2563eb"}}>(used for ROI)</span></div>
+                      {(form.giftPlanSales||[]).some(r=>r.prod) && (
+                        <button type="button" onClick={()=>set("giftActualSales",(form.giftPlanSales||[]).map(r=>({...r,id:uid()})))}
+                          style={{fontSize:11,fontWeight:800,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"3px 8px",cursor:"pointer",fontFamily:"inherit"}}>
+                          📋 Copy from Plan
+                        </button>
+                      )}
+                    </div>
+                    {(form.giftPlanSales||[]).some(r=>r.prod) && (
+                      <div style={{background:"#f8fafc",borderRadius:8,padding:"6px 10px",marginBottom:6,fontSize:11}}>
+                        <div style={{fontWeight:700,color:"#94a3b8",marginBottom:3}}>📌 Gift Planned</div>
+                        {(form.giftPlanSales||[]).filter(r=>r.prod).map((r,i)=>(
+                          <div key={i} style={{display:"flex",justifyContent:"space-between",color:"#64748b",padding:"1px 0"}}>
+                            <span>{r.prod}</span><span style={{fontWeight:700}}>×{r.qty||0} = {fmt(r.amt||0)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <SalesRows rows={form.giftActualSales||[{id:uid(),prod:"",qty:"",ptr:"",amt:""}]} onChange={v=>set("giftActualSales",v)} products={products} label=""/>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <div className="section-label" style={{marginBottom:0}}>📈 Actual Sales</div>
+                    {form.planSales&&form.planSales.some(r=>r.prod) && (
+                      <button type="button"
+                        onClick={()=>set("actualSales", form.planSales.map(r=>({...r, id:uid()})))}
+                        style={{fontSize:11,fontWeight:800,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"inherit"}}>
+                        📋 Copy from Plan
+                      </button>
+                    )}
+                  </div>
+                  {form.planSales&&form.planSales.some(r=>r.prod) && (
+                    <div style={{background:"#f8fafc",borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:11}}>
+                      <div style={{fontWeight:700,color:"#94a3b8",marginBottom:4,textTransform:"uppercase",letterSpacing:0.5}}>📌 Planned (reference)</div>
+                      {form.planSales.filter(r=>r.prod).map((r,i)=>(
+                        <div key={i} style={{display:"flex",justifyContent:"space-between",color:"#64748b",padding:"2px 0",borderBottom:"1px dashed #e2e8f0"}}>
+                          <span>{r.prod}</span>
+                          <span style={{fontWeight:700}}>Qty:{r.qty||0} × ₹{r.ptr||0} = <strong style={{color:"#4338ca"}}>{fmt(r.amt||0)}</strong></span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <SalesRows rows={form.actualSales} onChange={v=>set("actualSales",v)} products={products} label=""/>
+                </div>
+              )}
               {/* ROI with classification */}
               {roi && (()=>{ const rc=roiClass(roi); return rc?(
                 <div style={{borderRadius:12,padding:"14px 16px",textAlign:"center",fontWeight:900,fontSize:22,background:rc.bg,color:rc.color,border:`1px solid ${rc.border}`}}>
@@ -954,7 +1031,7 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
           <option value="issued">Issued</option>
         </select>
         <div className="flex-1"/>
-        <button className="btn btn-primary text-xs" onClick={()=>{setEditG(null);setModal(true);}}>🎁 + New Gift Entry</button>
+        <button id="quick-add-gifts-btn" className="btn btn-primary text-xs" onClick={()=>{setEditG(null);setModal(true);}}>🎁 + New Gift Entry</button>
       </div>
 
       {/* Summary strip */}
@@ -980,9 +1057,13 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
             </tr></thead>
             <tbody>
               {filtered.map((g, i) => {
-                const planAmt = g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
-                const actAmt  = g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
-                const roi = g.issued && Number(g.giftMrp)>0 && actAmt>0 ? (actAmt/Number(g.giftMrp)).toFixed(2) : null;
+                const planAmt = (g.crmType==="CRM"
+                  ? ((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
+                  : (g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))||0;
+                const actAmt  = (g.crmType==="CRM"
+                  ? ((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
+                  : (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))||0;
+                const roi = g.issued ? calcRoi(g) : null;
                 return (
                   <tr key={g.id}>
                     <td className="text-gray-400 text-xs">{i+1}</td>
@@ -1059,11 +1140,19 @@ function Dashboard({ gifts, onShare }) {
     entry.gifts.push(g);
     entry.planned++;
     entry.planAmt += Number(g.giftMrp||0);
-    entry.planSales += g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+    entry.planSales += g.crmType==="CRM"
+      ? ((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
+      : (g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
     if (g.issued) {
       entry.issued++;
       entry.actAmt += Number(g.giftMrp||0);
-      entry.actSales += g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+      entry.actSales += g.crmType==="CRM"
+        ? ((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
+        : (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
+      entry.giftActSales = (entry.giftActSales||0) + (g.crmType==="CRM"
+        ? (g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)
+        : (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
+      entry.giftPlanAmt = (entry.giftPlanAmt||0) + Number(g.giftMrp||0);
     }
   });
 
@@ -1083,11 +1172,15 @@ function Dashboard({ gifts, onShare }) {
   const totals = fGifts.reduce((acc,g)=>{
     acc.planned++;
     acc.planAmt += Number(g.giftMrp||0);
-    acc.planSales += g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+    acc.planSales += g.crmType==="CRM"
+      ? ((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
+      : (g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
     if (g.issued) {
       acc.issued++;
       acc.actAmt += Number(g.giftMrp||0);
-      acc.actSales += g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
+      acc.actSales += g.crmType==="CRM"
+        ? ((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
+        : (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
     }
     return acc;
   }, { planned:0, issued:0, planAmt:0, actAmt:0, planSales:0, actSales:0 });
@@ -1447,8 +1540,12 @@ function Reports({ gifts, products }) {
             <div className="section-label">Report Type</div>
             <select value={repType} onChange={e=>setRepType(e.target.value)} className="inp">
               <option value="deviation">Gift Plan vs Actual Deviation</option>
-              <option value="summary">Area/HQ/Month Summary</option>
+              <option value="summary">ASM/HQ/Month Summary</option>
               <option value="pending">Pending Actual Entry</option>
+              <option value="leaderboard">Doctor ROI Leaderboard</option>
+              <option value="mom">Month-over-Month Comparison</option>
+              <option value="doctor">Doctor-wise Report</option>
+              <option value="ytd">Year-to-Date Summary</option>
             </select>
           </div>
           <div>
@@ -1505,9 +1602,9 @@ function Reports({ gifts, products }) {
             // CSV Export
             let csv = "Month,ASM,HQ,Doctor,Speciality,Gift,Gift MRP,CRM,Status,Plan Sales,Actual Sales,ROI\n";
             filtered.forEach(g=>{
-              const ps = g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
-              const as = g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
-              const roi = g.issued&&Number(g.giftMrp)>0&&as>0?(as/Number(g.giftMrp)).toFixed(2):"";
+              const ps = g.crmType==="CRM"?((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)||0;
+              const as = g.crmType==="CRM"?((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)||0;
+              const roi = g.issued ? (calcRoi(g)||"") : "";
               csv += `"${g.month||""}","${g.asmName||""}","${g.hqName||""}","${g.doctorName||""}","${g.speciality||""}","${g.giftName||""}",${g.giftMrp||0},"${g.crmType||""}","${g.issued?"Issued":"Pending"}",${ps.toFixed(2)},${as.toFixed(2)},"${roi}"\n`;
             });
             const blob = new Blob([csv], {type:"text/csv"});
@@ -1531,9 +1628,9 @@ function Reports({ gifts, products }) {
             </tr></thead>
             <tbody>
               {filtered.slice(0,20).map(g=>{
-                const ps = g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
-                const as = g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
-                const roi = g.issued&&Number(g.giftMrp)>0&&as>0?(as/Number(g.giftMrp)).toFixed(2):null;
+                const ps = g.crmType==="CRM"?((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)||0;
+                const as = g.crmType==="CRM"?((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)||0;
+                const roi = g.issued ? calcRoi(g) : null;
                 return (
                   <tr key={g.id}>
                     <td className="text-xs">{g.month}</td>
@@ -2075,6 +2172,14 @@ function App() {
         )}
         {activeTab === "reports" && <Reports gifts={data.gifts} products={data.products}/>}
       </div>
+
+      {/* ── QUICK ADD FLOATING BUTTON ── */}
+      <button
+        onClick={()=>{ setActiveTab("gifts"); setTimeout(()=>document.getElementById("quick-add-gifts-btn")?.click(),100); }}
+        style={{position:"fixed",bottom:80,right:16,zIndex:42,width:52,height:52,borderRadius:"50%",background:"linear-gradient(135deg,#1e3a5f,#2563eb)",color:"white",border:"none",boxShadow:"0 4px 16px rgba(37,99,235,0.4)",cursor:"pointer",fontSize:24,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"inherit"}}
+        title="Add New Gift Entry">
+        +
+      </button>
 
       {/* ── MOBILE BOTTOM NAV ── */}
       <div className="mobile-bottom-nav">
