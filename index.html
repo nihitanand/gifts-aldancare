@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎁 GiftTrack v1.4 – Aldan Healthcare</title>
+  <title>🎁 GiftTrack v1.5 – Aldan Healthcare</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -27,7 +27,7 @@
     .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
     .tbl th { background: #1e3a5f; color: white; padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
     .tbl td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; vertical-align: middle; }
-    .tbl tr:hover td { background: #f8fafc; }
+    .tbl tbody tr:hover td { background: #f8fafc; }
     .tbl tfoot td { background: #e8edf5; font-weight: 800; border-top: 2px solid #2563eb; }
     .inp { width: 100%; padding: 9px 12px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.15s; background: white; }
     .inp:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
@@ -1057,12 +1057,8 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
             </tr></thead>
             <tbody>
               {filtered.map((g, i) => {
-                const planAmt = (g.crmType==="CRM"
-                  ? ((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
-                  : (g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))||0;
-                const actAmt  = (g.crmType==="CRM"
-                  ? ((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
-                  : (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))||0;
+                const planAmt = (g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
+                const actAmt  = g.issued ? (g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)) : 0;
                 const roi = g.issued ? calcRoi(g) : null;
                 return (
                   <tr key={g.id}>
@@ -1140,15 +1136,11 @@ function Dashboard({ gifts, onShare }) {
     entry.gifts.push(g);
     entry.planned++;
     entry.planAmt += Number(g.giftMrp||0);
-    entry.planSales += g.crmType==="CRM"
-      ? ((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
-      : (g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
+    entry.planSales += (g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
     if (g.issued) {
       entry.issued++;
       entry.actAmt += Number(g.giftMrp||0);
-      entry.actSales += g.crmType==="CRM"
-        ? ((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
-        : (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
+      entry.actSales += g.issued ? (g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)) : 0;
       entry.giftActSales = (entry.giftActSales||0) + (g.crmType==="CRM"
         ? (g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)
         : (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
@@ -1172,15 +1164,11 @@ function Dashboard({ gifts, onShare }) {
   const totals = fGifts.reduce((acc,g)=>{
     acc.planned++;
     acc.planAmt += Number(g.giftMrp||0);
-    acc.planSales += g.crmType==="CRM"
-      ? ((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
-      : (g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
+    acc.planSales += (g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
     if (g.issued) {
       acc.issued++;
       acc.actAmt += Number(g.giftMrp||0);
-      acc.actSales += g.crmType==="CRM"
-        ? ((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0))
-        : (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
+      acc.actSales += g.issued ? (g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)) : 0;
     }
     return acc;
   }, { planned:0, issued:0, planAmt:0, actAmt:0, planSales:0, actSales:0 });
@@ -1247,17 +1235,17 @@ function Dashboard({ gifts, onShare }) {
                 const regExpanded = expanded[reg];
 
                 return [
-                  <tr key={reg} style={{background:"#1e3a5f",cursor:"pointer"}} onClick={()=>toggle(reg)}>
-                    <td colSpan={1} style={{color:"white",fontWeight:800,fontSize:13}}>{regExpanded?"▼":"▶"} {reg}</td>
-                    <td style={{color:"rgba(255,255,255,0.6)",fontSize:11}}>{[selMonth==="all"?"All":selMonth,selAsm==="all"?"":selAsm,selHQ==="all"?"":selHQ].filter(Boolean).join(" · ")||"All"}</td>
-                    <td style={{color:"#93c5fd",fontWeight:800}}>{rTot.planned}</td>
-                    <td style={{color:"#6ee7b7",fontWeight:800}}>{rTot.issued}</td>
-                    <td style={{color:"#c4b5fd",fontWeight:800}} className="mono">{fmt(rTot.planAmt)}</td>
-                    <td style={{color:"#fcd34d",fontWeight:800}} className="mono">{fmt(rTot.actAmt)}</td>
-                    <td style={{color:"#7dd3fc",fontWeight:800}} className="mono">{fmt(rTot.planSales)}</td>
-                    <td style={{color:"#86efac",fontWeight:800}} className="mono">{fmt(rTot.actSales)}</td>
-                    <td style={{fontWeight:800,color:rROI?(roiClass(rROI)||{color:"#fca5a5"}).color:"#94a3b8"}}>{rROI?(()=>{const rc=roiClass(rROI);return rc?`${rROI}x ${rc.label}`:rROI+"x";})():"—"}</td>
-                    <td><button style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",color:"white",borderRadius:6,padding:"3px 8px",fontSize:11,cursor:"pointer",fontWeight:700}} onClick={e=>{e.stopPropagation();onShare("rsm",fGifts,reg+" — "+(selMonth==="all"?"All Months":selMonth),"rsm",{areas});}}> 📤</button></td>
+                  <tr key={reg} style={{background:"#1e3a5f",cursor:"pointer",WebkitTapHighlightColor:"transparent"}} onClick={()=>toggle(reg)}>
+                    <td style={{color:"#ffffff",fontWeight:800,fontSize:13,padding:"10px 12px"}}>{regExpanded?"▼":"▶"} {reg}</td>
+                    <td style={{color:"#bfdbfe",fontSize:11,padding:"10px 12px"}}>{[selMonth==="all"?"All":selMonth,selAsm==="all"?"":selAsm,selHQ==="all"?"":selHQ].filter(Boolean).join(" · ")||"All"}</td>
+                    <td style={{color:"#93c5fd",fontWeight:800,padding:"10px 12px"}}>{rTot.planned}</td>
+                    <td style={{color:"#6ee7b7",fontWeight:800,padding:"10px 12px"}}>{rTot.issued}</td>
+                    <td style={{color:"#e9d5ff",fontWeight:800,padding:"10px 12px"}} className="mono">{fmt(rTot.planAmt)}</td>
+                    <td style={{color:"#fcd34d",fontWeight:800,padding:"10px 12px"}} className="mono">{fmt(rTot.actAmt)}</td>
+                    <td style={{color:"#7dd3fc",fontWeight:800,padding:"10px 12px"}} className="mono">{fmt(rTot.planSales)}</td>
+                    <td style={{color:"#86efac",fontWeight:800,padding:"10px 12px"}} className="mono">{fmt(rTot.actSales)}</td>
+                    <td style={{fontWeight:800,color:rROI?(roiClass(rROI)||{color:"#fca5a5"}).color:"#94a3b8",padding:"10px 12px"}}>{rROI?(()=>{const rc=roiClass(rROI);return rc?`${rROI}x ${rc.label}`:rROI+"x";})():"—"}</td>
+                    <td style={{padding:"10px 8px"}}><button style={{background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.4)",color:"#ffffff",borderRadius:6,padding:"3px 8px",fontSize:11,cursor:"pointer",fontWeight:700,WebkitTapHighlightColor:"transparent"}} onClick={e=>{e.stopPropagation();onShare("rsm",fGifts,reg+" — "+(selMonth==="all"?"All Months":selMonth),"rsm",{areas});}}> 📤</button></td>
                   </tr>,
                   ...(!regExpanded ? [] : Object.entries(areas).flatMap(([area, hqs]) => {
                     const aTot = { planned:0, issued:0, planAmt:0, actAmt:0, planSales:0, actSales:0 };
@@ -1412,26 +1400,28 @@ function Reports({ gifts, products }) {
     <div class="meta">Report: <strong>${repType.toUpperCase()}</strong> | Month: ${selMonth==="all"?"All":selMonth} | Area: ${selArea==="all"?"All":selArea} | Generated: ${new Date().toLocaleDateString("en-IN",{day:"numeric",month:"long",year:"numeric"})}</div>`;
 
     if (repType === "deviation") {
-      body += `<h2>Gift Planned vs Actual Deviation</h2>
-      <table><thead><tr>
-        <th>Month</th><th>Area</th><th>HQ</th><th>ASM</th><th>Doctor</th><th>Gift</th><th>Gift MRP</th><th>Plan Sales</th><th>Status</th><th>Act Sales</th><th>ROI</th><th>Deviation</th>
-      </tr></thead><tbody>`;
+      body += `<h2>Gift Plan vs Actual Deviation</h2>
+      <table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:8%"><col style="width:11%"><col style="width:11%"><col style="width:13%"><col style="width:13%"><col style="width:8%"><col style="width:9%"><col style="width:7%"><col style="width:9%"><col style="width:6%"><col style="width:9%"></colgroup>
+        <thead><tr><th>Month</th><th>ASM</th><th>HQ</th><th>Doctor</th><th>Gift</th><th>MRP</th><th>Plan Sales</th><th>Status</th><th>Act Sales</th><th>ROI</th><th>Deviation</th></tr></thead><tbody>`;
       filtered.forEach(g => {
-        const planSales = g.planSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
-        const actSales  = g.actualSales?.reduce((s,r)=>s+Number(r.amt||0),0)||0;
-        const roi = g.issued&&Number(g.giftMrp)>0&&actSales>0?(actSales/Number(g.giftMrp)).toFixed(2):null;
-        const dev = g.issued ? actSales - planSales : null;
+        const ps = (g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
+        const as = g.issued ? (g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)) : 0;
+        const roi = g.issued ? calcRoi(g) : null;
+        const dev = g.issued ? as - ps : null;
+        const roiLbl = roi?(Number(roi)<3?"Poor":Number(roi)<4?"Avg":Number(roi)<5?"Good":"Excel"):"";
         body += `<tr>
-          <td>${g.month||"—"}</td><td>${g.asmName||"—"}</td><td>${g.hqName||"—"}</td>
-          <td><strong>${g.doctorName}</strong></td><td>${g.giftName}</td>
-          <td>₹${Number(g.giftMrp||0).toFixed(2)}</td>
-          <td>₹${planSales.toFixed(2)}</td>
-          <td><span class="badge ${g.issued?"issued":"pending"}">${g.issued?"✓ Issued":"⏳ Pending"}</span></td>
-          <td>${actSales>0?"₹"+actSales.toFixed(2):"—"}</td>
-          <td>${roi?`${roi}x`:"—"}</td>
-          <td class="${dev!=null?(dev>=0?"g":"r"):""}">
-            ${dev!=null?(dev>=0?"+":"")+fmt(dev):"—"}
-          </td>
+          <td style="font-size:10px">${g.month||"—"}</td>
+          <td style="font-size:10px">${g.asmName||"—"}</td>
+          <td style="font-size:10px">${g.hqName||"—"}</td>
+          <td><strong>${g.doctorName}</strong></td>
+          <td style="font-size:10px">${g.giftName}</td>
+          <td>₹${Math.round(g.giftMrp||0)}</td>
+          <td>₹${Math.round(ps)}</td>
+          <td><span class="badge ${g.issued?"issued":"pending"}">${g.issued?"✓":"⏳"}</span></td>
+          <td>${as>0?"₹"+Math.round(as):"—"}</td>
+          <td class="${roi?(Number(roi)>=3?"g":"r"):""}"><strong>${roi?roi+"x":"—"}</strong></td>
+          <td class="${dev!=null?(dev>=0?"g":"r"):""}"><strong>${dev!=null?(dev>=0?"+":"")+fmt(dev):"—"}</strong></td>
         </tr>`;
       });
       body += "</tbody></table>";
@@ -1444,31 +1434,31 @@ function Reports({ gifts, products }) {
         if (!groups[key||"—"]) groups[key||"—"] = [];
         groups[key||"—"].push(g);
       });
-      body += `<h2>Area/HQ/Month Gift Summary</h2>`;
+      body += `<h2>ASM/HQ/Month Gift Summary</h2>
+      <table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:14%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:14%"></colgroup>
+        <thead><tr><th>Group</th><th>Planned</th><th>Issued</th><th>Pending</th><th>Gift Amt</th><th>Plan Sales</th><th>Act Sales</th><th>ROI</th></tr></thead><tbody>`;
       Object.entries(groups).forEach(([grp, gs]) => {
         const planned = gs.length;
         const issued  = gs.filter(g=>g.issued).length;
         const planAmt = gs.reduce((s,g)=>s+Number(g.giftMrp||0),0);
         const actAmt  = gs.filter(g=>g.issued).reduce((s,g)=>s+Number(g.giftMrp||0),0);
-        const planSales = gs.reduce((s,g)=>s+(g.planSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0),0);
-        const actSales  = gs.reduce((s,g)=>s+(g.issued?(g.actualSales?.reduce((a,r)=>a+Number(r.amt||0),0)||0):0),0);
-        const roi = actAmt>0&&actSales>0?(actSales/actAmt).toFixed(2):null;
-        body += `<h2>${grp}</h2>
-        <table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>
-          <tr><td>Planned Gifts</td><td><strong>${planned}</strong></td></tr>
-          <tr><td>Issued Gifts</td><td><strong>${issued}</strong></td></tr>
-          <tr><td>Pending</td><td><strong>${planned-issued}</strong></td></tr>
-          <tr><td>Gift Plan Amt</td><td><strong>${fmt(planAmt)}</strong></td></tr>
-          <tr><td>Gift Actual Amt (Issued)</td><td><strong>${fmt(actAmt)}</strong></td></tr>
-          <tr><td>Expected Sales</td><td><strong>${fmt(planSales)}</strong></td></tr>
-          <tr><td>Actual Sales</td><td><strong>${fmt(actSales)}</strong></td></tr>
-          <tr><td>Overall ROI</td><td class="${roi&&Number(roi)>=1?"g":"r"}"><strong>${roi?roi+"x":"—"}</strong></td></tr>
-        </tbody></table>`;
+        const planSales = gs.reduce((s,g)=>s+(g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)),0);
+        const actSales  = gs.reduce((s,g)=>s+(g.issued?(g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):0),0);
+        const actMrp = gs.filter(g=>g.issued).reduce((s,g)=>s+Number(g.giftMrp||0),0);
+        const roi = actMrp>0&&actSales>0?(actSales/actMrp).toFixed(2):null;
+        const roiLbl = roi?(Number(roi)<3?"Poor":Number(roi)<4?"Avg":Number(roi)<5?"Good":"Excellent"):"—";
+        body += `<tr>
+          <td><strong>${grp}</strong></td>
+          <td>${planned}</td><td class="g">${issued}</td><td class="${planned-issued>0?"r":"g"}">${planned-issued}</td>
+          <td>${fmt(planAmt)}</td><td>${fmt(planSales)}</td><td>${fmt(actSales)}</td>
+          <td class="${roi?(Number(roi)>=3?"g":"r"):""}"><strong>${roi?roi+"x — "+roiLbl:"—"}</strong></td>
+        </tr>`;
         if (inclProdDet) {
           gs.forEach(g => {
-            const actSalesG = (g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
-            const planSalesG = (g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0);
-            const roiG = g.issued&&Number(g.giftMrp)>0&&actSalesG>0?(actSalesG/Number(g.giftMrp)).toFixed(2):null;
+            const actSalesG = g.issued ? (g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)) : 0;
+            const planSalesG = (g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
+            const roiG = g.issued ? calcRoi(g) : null;
             const roiLabel = roiG ? (Number(roiG)<3?"Poor":Number(roiG)<4?"Average":Number(roiG)<5?"Good":"Excellent") : "—";
             body += `<div style="margin:6px 0;padding:10px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
@@ -1478,25 +1468,28 @@ function Reports({ gifts, products }) {
                   ${g.giftName} · MRP ₹${Math.round(Number(g.giftMrp||0))}
                 </span>
               </div>`;
-            // Plan sales rows
-            if((g.planSales||[]).some(r=>r.prod)) {
-              body += `<table style="width:100%;font-size:11px;margin-bottom:4px"><thead><tr style="background:#f8fafc"><th style="padding:4px 6px;text-align:left">Product (Plan)</th><th style="padding:4px 6px;text-align:right">Qty</th><th style="padding:4px 6px;text-align:right">PTR</th><th style="padding:4px 6px;text-align:right">Value</th></tr></thead><tbody>`;
+            // Gift Plan sales rows
+            const planRows = g.crmType==="CRM"?(g.giftPlanSales||[]):(g.planSales||[]);
+            if(planRows.some(r=>r.prod)) {
+              body += `<table style="width:100%;font-size:11px;margin-bottom:4px"><thead><tr style="background:#f8fafc"><th style="padding:4px 6px;text-align:left">Product (Gift Plan)</th><th style="padding:4px 6px;text-align:right">Qty</th><th style="padding:4px 6px;text-align:right">PTR</th><th style="padding:4px 6px;text-align:right">Value</th></tr></thead><tbody>`;
               let pSub=0;
-              (g.planSales||[]).filter(r=>r.prod).forEach(r=>{
+              planRows.filter(r=>r.prod).forEach(r=>{
                 const amt=Number(r.amt||0); pSub+=amt;
                 body+=`<tr><td style="padding:3px 6px">${r.prod}</td><td style="padding:3px 6px;text-align:right">${r.qty||0}</td><td style="padding:3px 6px;text-align:right">₹${Math.round(Number(r.ptr||0))}</td><td style="padding:3px 6px;text-align:right">₹${Math.round(amt)}</td></tr>`;
               });
-              body+=`<tr style="background:#eff6ff"><td colspan="3" style="padding:4px 6px;font-weight:700">Plan Sub-Total</td><td style="padding:4px 6px;text-align:right;font-weight:700">₹${Math.round(pSub)}</td></tr></tbody></table>`;
+              body+=`<tr style="background:#eff6ff"><td colspan="3" style="padding:4px 6px;font-weight:700">Gift Plan Sub-Total</td><td style="padding:4px 6px;text-align:right;font-weight:700">₹${Math.round(pSub)}</td></tr></tbody></table>`;
             }
-            // Actual sales rows
-            if(g.issued && (g.actualSales||[]).some(r=>r.prod)) {
-              body += `<table style="width:100%;font-size:11px"><thead><tr style="background:#f0fdf4"><th style="padding:4px 6px;text-align:left">Product (Actual)</th><th style="padding:4px 6px;text-align:right">Qty</th><th style="padding:4px 6px;text-align:right">PTR</th><th style="padding:4px 6px;text-align:right">Value</th></tr></thead><tbody>`;
+            // Gift Actual sales rows
+            const actRows = g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]):(g.actualSales||[]);
+            if(g.issued && actRows.some(r=>r.prod)) {
+              body += `<table style="width:100%;font-size:11px"><thead><tr style="background:#f0fdf4"><th style="padding:4px 6px;text-align:left">Product (Gift Actual)</th><th style="padding:4px 6px;text-align:right">Qty</th><th style="padding:4px 6px;text-align:right">PTR</th><th style="padding:4px 6px;text-align:right">Value</th></tr></thead><tbody>`;
               let aSub=0;
-              (g.actualSales||[]).filter(r=>r.prod).forEach(r=>{
+              actRows.filter(r=>r.prod).forEach(r=>{
                 const amt=Number(r.amt||0); aSub+=amt;
                 body+=`<tr><td style="padding:3px 6px">${r.prod}</td><td style="padding:3px 6px;text-align:right">${r.qty||0}</td><td style="padding:3px 6px;text-align:right">₹${Math.round(Number(r.ptr||0))}</td><td style="padding:3px 6px;text-align:right">₹${Math.round(amt)}</td></tr>`;
               });
-              body+=`<tr style="background:#dcfce7"><td colspan="3" style="padding:4px 6px;font-weight:700">Actual Sub-Total</td><td style="padding:4px 6px;text-align:right;font-weight:700">₹${Math.round(aSub)}</td></tr></tbody></table>`;
+              body+=`<tr style="background:#dcfce7"><td colspan="3" style="padding:4px 6px;font-weight:700">Gift Actual Sub-Total</td><td style="padding:4px 6px;text-align:right;font-weight:700">₹${Math.round(aSub)}</td></tr></tbody></table>`;
+              const roiLabel = roiG ? (Number(roiG)<3?"Poor":Number(roiG)<4?"Average":Number(roiG)<5?"Good":"Excellent") : "—";
               body+=`<div style="margin-top:4px;font-weight:800;color:${Number(roiG||0)<3?"#dc2626":Number(roiG||0)<4?"#d97706":Number(roiG||0)<5?"#2563eb":"#16a34a"}">ROI: ${roiG?roiG+"x — "+roiLabel:"—"}</div>`;
             }
             body += `</div>`;
@@ -1514,6 +1507,104 @@ function Reports({ gifts, products }) {
       });
       body += `</tbody><tfoot><tr class="tf"><td colspan="7"><strong>Total Pending</strong></td><td><strong>${fmt(pending.reduce((s,g)=>s+Number(g.giftMrp||0),0))}</strong></td><td></td></tr></tfoot></table>`;
     }
+
+    if (repType === "leaderboard") {
+      const docMap = {};
+      filtered.filter(g=>g.issued).forEach(g=>{
+        const k=g.doctorName||"Unknown";
+        if(!docMap[k]) docMap[k]={name:k,hq:g.hqName||"—",asm:g.asmName||"—",gifts:0,totalMrp:0,totalSales:0};
+        docMap[k].gifts++;
+        docMap[k].totalMrp+=Number(g.giftMrp||0);
+        docMap[k].totalSales+=(g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
+      });
+      const ranked=Object.values(docMap).map(d=>{
+        const roi=d.totalMrp>0&&d.totalSales>0?(d.totalSales/d.totalMrp).toFixed(2):null;
+        const roiLbl=roi?(Number(roi)<3?"Poor":Number(roi)<4?"Average":Number(roi)<5?"Good":"Excellent"):"—";
+        return {...d,roi,roiLbl};
+      }).sort((a,b)=>Number(b.roi||0)-Number(a.roi||0));
+      body += `<h2>Doctor ROI Leaderboard (${ranked.length} doctors with issued gifts)</h2>
+      <table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:5%"><col style="width:20%"><col style="width:15%"><col style="width:15%"><col style="width:7%"><col style="width:13%"><col style="width:13%"><col style="width:12%"></colgroup>
+        <thead><tr><th>#</th><th>Doctor</th><th>HQ</th><th>ASM</th><th>Gifts</th><th>Gift Investment</th><th>Gift Sales</th><th>ROI</th></tr></thead><tbody>`;
+      ranked.forEach((d,i)=>{
+        body+=`<tr><td><strong>#${i+1}</strong></td><td><strong>${d.name}</strong></td><td>${d.hq}</td><td>${d.asm}</td><td>${d.gifts}</td><td>${fmt(d.totalMrp)}</td><td>${fmt(d.totalSales)}</td><td class="${d.roi&&Number(d.roi)>=3?"g":"r"}"><strong>${d.roi?d.roi+"x — "+d.roiLbl:"—"}</strong></td></tr>`;
+      });
+      body+=`</tbody></table>`;
+    }
+
+    if (repType === "mom") {
+      const months=[...new Set(gifts.map(g=>g.month).filter(Boolean))].sort();
+      body += `<h2>Month-over-Month Comparison</h2>
+      <table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:12%"><col style="width:10%"><col style="width:10%"><col style="width:10%"><col style="width:14%"><col style="width:14%"><col style="width:14%"><col style="width:16%"></colgroup>
+        <thead><tr><th>Month</th><th>Planned</th><th>Issued</th><th>Pending</th><th>Gift Amt</th><th>Plan Sales</th><th>Act Sales</th><th>ROI</th></tr></thead><tbody>`;
+      months.forEach(m=>{
+        const mg=gifts.filter(g=>g.month===m&&(selArea==="all"||g.asmName===selArea)&&(selHQ==="all"||g.hqName===selHQ));
+        const mi=mg.filter(g=>g.issued);
+        const mMrp=mg.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+        const mPlanSales=mg.reduce((s,g)=>s+(g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)),0);
+        const mActSales=mi.reduce((s,g)=>s+(g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)),0);
+        const mActMrp=mi.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+        const mRoi=mActMrp>0&&mActSales>0?(mActSales/mActMrp).toFixed(2):null;
+        const roiLbl=mRoi?(Number(mRoi)<3?"Poor":Number(mRoi)<4?"Average":Number(mRoi)<5?"Good":"Excellent"):"—";
+        body+=`<tr><td><strong>${m}</strong></td><td>${mg.length}</td><td class="g">${mi.length}</td><td class="${mg.length-mi.length>0?"r":"g"}">${mg.length-mi.length}</td><td>${fmt(mMrp)}</td><td>${fmt(mPlanSales)}</td><td>${fmt(mActSales)}</td><td class="${mRoi&&Number(mRoi)>=3?"g":"r"}"><strong>${mRoi?mRoi+"x — "+roiLbl:"—"}</strong></td></tr>`;
+      });
+      body+=`</tbody></table>`;
+    }
+
+    if (repType === "doctor") {
+      const docMap={};
+      filtered.forEach(g=>{
+        const k=g.doctorName||"Unknown";
+        if(!docMap[k]) docMap[k]={name:k,hq:g.hqName,asm:g.asmName,speciality:g.speciality,gifts:[]};
+        docMap[k].gifts.push(g);
+      });
+      body += `<h2>Doctor-wise Gift Report</h2>`;
+      Object.values(docMap).sort((a,b)=>a.name.localeCompare(b.name)).forEach(d=>{
+        const totMrp=d.gifts.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+        const issuedG=d.gifts.filter(g=>g.issued);
+        const totSales=issuedG.reduce((s,g)=>s+(g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)),0);
+        const totActMrp=issuedG.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+        const roi=totActMrp>0&&totSales>0?(totSales/totActMrp).toFixed(2):null;
+        const roiLbl=roi?(Number(roi)<3?"Poor":Number(roi)<4?"Average":Number(roi)<5?"Good":"Excellent"):"—";
+        body+=`<div style="margin:12px 0 4px;padding:6px 10px;background:#f1f5f9;border-radius:6px;font-size:12px;font-weight:800;color:#1e3a5f">${d.name} <span style="font-weight:400;color:#64748b;font-size:11px">${d.speciality||""}${d.hq?" · "+d.hq:""}${d.asm?" · "+d.asm:""}</span></div>`;
+        body+=`<table style="table-layout:fixed;width:100%;margin-bottom:6px">
+          <colgroup><col style="width:12%"><col style="width:18%"><col style="width:8%"><col style="width:7%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:10%"></colgroup>
+          <thead><tr><th>Month</th><th>Gift</th><th>MRP</th><th>CRM</th><th>Status</th><th>Plan Sales</th><th>Act Sales</th><th>ROI</th></tr></thead><tbody>`;
+        d.gifts.forEach(g=>{
+          const ps=(g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
+          const as=g.issued?(g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):0;
+          const gRoi=g.issued?calcRoi(g):null;
+          const gRoiLbl=gRoi?(Number(gRoi)<3?"Poor":Number(gRoi)<4?"Avg":Number(gRoi)<5?"Good":"Excel"):"";
+          body+=`<tr><td style="font-size:10px">${g.month||"—"}</td><td style="font-size:10px">${g.giftName}</td><td>${fmt(g.giftMrp)}</td><td>${g.crmType}</td><td><span class="badge ${g.issued?"issued":"pending"}">${g.issued?"✓ Issued":"⏳ Pending"}</span></td><td>${fmt(ps)}</td><td>${as>0?fmt(as):"—"}</td><td class="${gRoi&&Number(gRoi)>=3?"g":"r"}">${gRoi?gRoi+"x "+gRoiLbl:"—"}</td></tr>`;
+        });
+        body+=`</tbody><tfoot><tr class="tf"><td colspan="2"><strong>Total (${d.gifts.length} gifts)</strong></td><td><strong>${fmt(totMrp)}</strong></td><td></td><td>${issuedG.length}/${d.gifts.length}</td><td></td><td>${fmt(totSales)}</td><td class="${roi&&Number(roi)>=3?"g":"r"}"><strong>${roi?roi+"x — "+roiLbl:"—"}</strong></td></tr></tfoot></table>`;
+      });
+    }
+
+    if (repType === "ytd") {
+      const months=[...new Set(gifts.map(g=>g.month).filter(Boolean))].sort();
+      let cumPlanned=0,cumIssued=0,cumGiftAmt=0,cumGiftActSales=0;
+      body += `<h2>Year-to-Date Cumulative Summary</h2>
+      <table style="table-layout:fixed;width:100%">
+        <colgroup><col style="width:12%"><col style="width:10%"><col style="width:10%"><col style="width:13%"><col style="width:15%"><col style="width:15%"><col style="width:12%"><col style="width:13%"></colgroup>
+        <thead><tr><th>Month</th><th>Gifts</th><th>Issued</th><th>Cumul. Planned</th><th>Cumul. Gift Amt</th><th>Cumul. Gift Sales</th><th>Month ROI</th><th>YTD ROI</th></tr></thead><tbody>`;
+      months.forEach(m=>{
+        const mg=gifts.filter(g=>g.month===m&&(selArea==="all"||g.asmName===selArea)&&(selHQ==="all"||g.hqName===selHQ));
+        const mi=mg.filter(g=>g.issued);
+        const mMrp=mg.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+        const mGiftAct=mi.reduce((s,g)=>s+(g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)),0);
+        const mActMrp=mi.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+        const mRoi=mActMrp>0&&mGiftAct>0?(mGiftAct/mActMrp).toFixed(2):null;
+        cumPlanned+=mg.length; cumIssued+=mi.length; cumGiftAmt+=mMrp; cumGiftActSales+=mGiftAct;
+        const ytdRoi=cumGiftAmt>0&&cumGiftActSales>0?(cumGiftActSales/cumGiftAmt).toFixed(2):null;
+        const mRoiLbl=mRoi?(Number(mRoi)<3?"Poor":Number(mRoi)<4?"Avg":Number(mRoi)<5?"Good":"Excel"):"—";
+        const ytdLbl=ytdRoi?(Number(ytdRoi)<3?"Poor":Number(ytdRoi)<4?"Avg":Number(ytdRoi)<5?"Good":"Excel"):"—";
+        body+=`<tr><td><strong>${m}</strong></td><td>${mg.length}</td><td>${mi.length}</td><td>${cumPlanned}</td><td>${fmt(cumGiftAmt)}</td><td>${fmt(cumGiftActSales)}</td><td class="${mRoi&&Number(mRoi)>=3?"g":"r"}">${mRoi?mRoi+"x "+mRoiLbl:"—"}</td><td class="${ytdRoi&&Number(ytdRoi)>=3?"g":"r"}"><strong>${ytdRoi?ytdRoi+"x "+ytdLbl:"—"}</strong></td></tr>`;
+      });
+      body+=`</tbody></table>`;
+    }
+
 
     body += `<div style="margin-top:32px;font-size:10px;color:#d1d5db;text-align:center;border-top:1px solid #f3f4f6;padding-top:8px">GiftTrack – Aldan Healthcare · Generated ${new Date().toLocaleDateString("en-IN")}</div>`;
 
@@ -1602,8 +1693,8 @@ function Reports({ gifts, products }) {
             // CSV Export
             let csv = "Month,ASM,HQ,Doctor,Speciality,Gift,Gift MRP,CRM,Status,Plan Sales,Actual Sales,ROI\n";
             filtered.forEach(g=>{
-              const ps = g.crmType==="CRM"?((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)||0;
-              const as = g.crmType==="CRM"?((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)||0;
+              const ps = (g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
+              const as = g.issued ? (g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)) : 0;
               const roi = g.issued ? (calcRoi(g)||"") : "";
               csv += `"${g.month||""}","${g.asmName||""}","${g.hqName||""}","${g.doctorName||""}","${g.speciality||""}","${g.giftName||""}",${g.giftMrp||0},"${g.crmType||""}","${g.issued?"Issued":"Pending"}",${ps.toFixed(2)},${as.toFixed(2)},"${roi}"\n`;
             });
@@ -1628,8 +1719,8 @@ function Reports({ gifts, products }) {
             </tr></thead>
             <tbody>
               {filtered.slice(0,20).map(g=>{
-                const ps = g.crmType==="CRM"?((g.crmPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)||0;
-                const as = g.crmType==="CRM"?((g.crmActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)+(g.giftActualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)||0;
+                const ps = (g.crmType==="CRM"?(g.giftPlanSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.planSales||[]).reduce((s,r)=>s+Number(r.amt||0),0));
+                const as = g.issued ? (g.crmType==="CRM"?(g.giftActualSales||g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0):(g.actualSales||[]).reduce((s,r)=>s+Number(r.amt||0),0)) : 0;
                 const roi = g.issued ? calcRoi(g) : null;
                 return (
                   <tr key={g.id}>
@@ -1793,7 +1884,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
 
   // Level label + subtitle right side
   tf(ctx,levelLabel,W-16,34,16,"900","#1e3a5f","right",580);
-  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.4",W-16,56,10,"600","#94a3b8","right");
+  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.5",W-16,56,10,"600","#94a3b8","right");
   y=80;
 
   // ── KPI STRIP ──
@@ -1975,7 +2066,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
     y+=32;
   }
   rect(ctx,0,y,W,38,"#f8fafc"); hline(ctx,y,"#e2e8f0",1);
-  tf(ctx,"GiftTrack v1.4  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
+  tf(ctx,"GiftTrack v1.5  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
   y+=38;
 
   // ── Crop and export ──
@@ -2123,7 +2214,7 @@ function App() {
             <div style={{ width: 1, height: 28, background: "#e2e8f0" }} className="desktop-nav"></div>
             <div>
               <div style={{ fontWeight: 900, fontSize: 15, color: "#1e3a5f", lineHeight: 1.1 }}>GiftTrack</div>
-              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.4 · Apr 2026</div>
+              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.5 · Apr 2026</div>
             </div>
           </div>
           {/* Desktop nav tabs */}
