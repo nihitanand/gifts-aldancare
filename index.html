@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎁 GiftTrack v1.5 – Aldan Healthcare</title>
+  <title>🎁 GiftTrack v1.6 – Aldan Healthcare</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -174,7 +174,7 @@ const BG = () => ({
   // Plan
   asmName: "", hqName: "", doctorName: "", doctorMobile: "", speciality: "", location: "",
   month: CUR_MONTH, giftName: "", giftMrp: "", giftPhotoUrl: "",
-  crmType: "CRM",
+  crmType: "Non-CRM",
   planSales:     [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
   crmPlanSales:  [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
   giftPlanSales: [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
@@ -693,9 +693,17 @@ function ProductModal({ open, onClose, onSave, initial }) {
    GIFT ITEM MODAL (Gift Master add/edit)
 ══════════════════════════════════ */
 function GiftItemModal({ open, onClose, onSave, initial }) {
-  const [form, setForm] = useState({ name:"", mrp:"", month:"", photoUrl:"", notes:"" });
+  const [form, setForm] = useState({ name:"", mrp:"", monthInput:CUR_MONTH_INPUT, photoUrl:"", notes:"" });
   const fileRef = useRef();
-  useEffect(() => { if (open) setForm(initial || { name:"", mrp:"", month:"", photoUrl:"", notes:"" }); }, [open, initial]);
+  useEffect(() => {
+    if (open) {
+      if (initial) {
+        setForm({...initial, monthInput: monthLabelToInput(initial.month||"")});
+      } else {
+        setForm({ name:"", mrp:"", monthInput:CUR_MONTH_INPUT, photoUrl:"", notes:"" });
+      }
+    }
+  }, [open, initial]);
   if (!open) return null;
   const set = (k,v) => setForm(f=>({...f,[k]:v}));
   const handlePhoto = (e) => {
@@ -715,7 +723,7 @@ function GiftItemModal({ open, onClose, onSave, initial }) {
           <div><div className="section-label">Gift Name *</div><input value={form.name} onChange={e=>set("name",e.target.value)} className="inp" placeholder="e.g. Diary, Pen Set, Stethoscope" autoFocus/></div>
           <div className="grid grid-cols-2 gap-3">
             <div><div className="section-label">MRP (₹) *</div><input type="number" value={form.mrp} onChange={e=>set("mrp",e.target.value)} className="inp mono" placeholder="0.00"/></div>
-            <div><div className="section-label">Month</div><input value={form.month} onChange={e=>set("month",e.target.value)} className="inp" placeholder="e.g. Apr 2026"/></div>
+            <div><div className="section-label">Month</div><input type="month" value={form.monthInput||CUR_MONTH_INPUT} onChange={e=>set("monthInput",e.target.value)} className="inp mono"/></div>
           </div>
           <div><div className="section-label">Notes / Description</div><input value={form.notes} onChange={e=>set("notes",e.target.value)} className="inp" placeholder="Optional details…"/></div>
           <div>
@@ -734,7 +742,7 @@ function GiftItemModal({ open, onClose, onSave, initial }) {
           <div className="flex gap-3 pt-2">
             <button className="btn btn-ghost flex-1" onClick={onClose}>Cancel</button>
             <button className="btn btn-primary flex-1" disabled={!form.name||!form.mrp}
-              onClick={()=>{ onSave({...form, mrp:Number(form.mrp), id:initial?.id||uid()}); onClose(); }}>
+              onClick={()=>{ onSave({...form, mrp:Number(form.mrp), month:monthInputToLabel(form.monthInput||CUR_MONTH_INPUT), id:initial?.id||uid()}); onClose(); }}>
               Save Gift Item
             </button>
           </div>
@@ -1884,7 +1892,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
 
   // Level label + subtitle right side
   tf(ctx,levelLabel,W-16,34,16,"900","#1e3a5f","right",580);
-  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.5",W-16,56,10,"600","#94a3b8","right");
+  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.6",W-16,56,10,"600","#94a3b8","right");
   y=80;
 
   // ── KPI STRIP ──
@@ -2066,7 +2074,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
     y+=32;
   }
   rect(ctx,0,y,W,38,"#f8fafc"); hline(ctx,y,"#e2e8f0",1);
-  tf(ctx,"GiftTrack v1.5  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
+  tf(ctx,"GiftTrack v1.6  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
   y+=38;
 
   // ── Crop and export ──
@@ -2214,7 +2222,7 @@ function App() {
             <div style={{ width: 1, height: 28, background: "#e2e8f0" }} className="desktop-nav"></div>
             <div>
               <div style={{ fontWeight: 900, fontSize: 15, color: "#1e3a5f", lineHeight: 1.1 }}>GiftTrack</div>
-              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.5 · Apr 2026</div>
+              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.6 · Apr 2026</div>
             </div>
           </div>
           {/* Desktop nav tabs */}
