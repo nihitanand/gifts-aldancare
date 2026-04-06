@@ -108,6 +108,9 @@ const toArr = v => {
 };
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const CUR_MONTH = MONTHS[new Date().getMonth()] + " " + new Date().getFullYear();
+const CUR_MONTH_INPUT = new Date().toISOString().slice(0,7); // "YYYY-MM" for <input type="month">
+const monthInputToLabel = (v) => { if(!v) return ""; const [y,m]=v.split("-"); return new Date(Number(y),Number(m)-1,1).toLocaleString("en-IN",{month:"short",year:"numeric"}); };
+const monthLabelToInput = (v) => { if(!v) return CUR_MONTH_INPUT; try { const d=new Date(v+" 1"); return isNaN(d.getTime())?CUR_MONTH_INPUT:d.toISOString().slice(0,7); } catch { return CUR_MONTH_INPUT; } };
 const HQ_LIST = ["Patna-1 (Raj Pd)","Patna-2 (Hemant)","Patna-3 (Mrityunjay)","Saharsa","Begusarai","Purnea","Muzaffarpur","Darbhanga","Siwan","Bettiah"];
 const ASM_LIST = ["Patna ASM","Darbhanga ASM","Saharsa ASM"];
 const REGION_FIXED = "RSM Bihar";
