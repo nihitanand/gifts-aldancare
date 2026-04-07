@@ -881,13 +881,12 @@ function DoctorMaster({ gifts, doctors, onAdd, onEdit, onDelete }) {
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState("");
 
-  // Merge: doctors from master + auto from gift entries (no duplicates)
-  const masterIds = new Set(doctors.map(d=>d.id));
+  // Merge: doctors from master + auto from gift entries (no duplicates by name)
   const fromGifts = [];
-  const seen = new Set(doctors.map(d=>d.name.toLowerCase()));
+  const masterNames = new Set(doctors.map(d=>d.name.toLowerCase()));
   gifts.forEach(g=>{
-    if(g.doctorName && !seen.has(g.doctorName.toLowerCase())){
-      seen.add(g.doctorName.toLowerCase());
+    if(g.doctorName && !masterNames.has(g.doctorName.toLowerCase())){
+      masterNames.add(g.doctorName.toLowerCase());
       fromGifts.push({ id:"gift_"+g.doctorName, name:g.doctorName, speciality:g.speciality||"", location:g.location||"", hqName:g.hqName||"", asmName:g.asmName||"", mobile:g.doctorMobile||"", _fromGift:true });
     }
   });
