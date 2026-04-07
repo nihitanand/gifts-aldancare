@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎁 GiftTrack v1.6 – Aldan Healthcare</title>
+  <title>🎁 GiftTrack v1.7 – Aldan Healthcare</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -526,6 +526,7 @@ function GiftModal({ open, onClose, onSave, initial, products, doctors, gifts, g
                 <div><span style={{color:"#94a3b8",fontWeight:600}}>Doctor: </span><strong>{form.doctorName||"—"}</strong></div>
                 <div><span style={{color:"#94a3b8",fontWeight:600}}>Gift: </span><strong>{form.giftName||"—"}</strong>{form.giftMrp?<span style={{color:"#4338ca",fontWeight:800}}> ({fmt(form.giftMrp)})</span>:""}</div>
                 <div><span style={{color:"#94a3b8",fontWeight:600}}>HQ: </span><strong>{form.hqName||"—"}</strong></div>
+                <div><span style={{color:"#94a3b8",fontWeight:600}}>Location: </span><strong>{form.location||"—"}</strong></div>
                 <div><span style={{color:"#94a3b8",fontWeight:600}}>Month: </span><strong>{form.month||"—"}</strong></div>
               </div>
               {/* Issued toggle + date */}
@@ -894,7 +895,7 @@ function DoctorMaster({ gifts, doctors, onAdd, onEdit, onDelete }) {
 
   return (
     <div>
-      <DoctorModal open={modal} onClose={()=>{setModal(false);setEditD(null);}} onSave={d=>editD?onEdit(d):onAdd(d)} initial={editD}/>
+      <DoctorModal open={modal} onClose={()=>{setModal(false);setEditD(null);}} onSave={d=>{ if(editD?._fromGift){ onAdd({...d,id:uid()}); } else if(editD){ onEdit(d); } else { onAdd(d); } }} initial={editD}/>
       <Confirm open={!!confirm} msg="Remove this doctor from master?" onOk={()=>{onDelete(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>
       <div className="flex flex-wrap gap-3 items-center mb-4">
         <div>
@@ -924,7 +925,7 @@ function DoctorMaster({ gifts, doctors, onAdd, onEdit, onDelete }) {
                   <td><span className={`badge ${d._fromGift?"bg-amber-100 text-amber-700":"bg-emerald-100 text-emerald-700"}`}>{d._fromGift?"Gift Entry":"Master"}</span></td>
                   <td>
                     <div className="flex gap-2">
-                      <button onClick={()=>{setEditD(d._fromGift?{...d,id:undefined,_fromGift:undefined}:d);setModal(true);}} className="text-blue-300 hover:text-blue-600">✏️</button>
+                      <button onClick={()=>{setEditD(d._fromGift?{...d,_fromGift:true}:d);setModal(true);}} className="text-blue-300 hover:text-blue-600">✏️</button>
                       {!d._fromGift && <button onClick={()=>setConfirm(d.id)} className="text-gray-200 hover:text-red-500">🗑️</button>}
                     </div>
                   </td>
@@ -996,12 +997,13 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
   const [fAsm, setFAsm] = useState("all");
   const [fHQ, setFHQ] = useState("all");
   const [fStatus, setFStatus] = useState("all");
+  const [fLocation, setFLocation] = useState("all");
   const [modal, setModal] = useState(false);
   const [editG, setEditG] = useState(null);
   const [confirm, setConfirm] = useState(null);
 
-  const months = [...new Set(gifts.map(g=>g.month).filter(Boolean))].sort();
-  // ASM list is fixed
+  const months    = [...new Set(gifts.map(g=>g.month).filter(Boolean))].sort();
+  const locations = [...new Set(gifts.map(g=>g.location).filter(Boolean))].sort();
 
   const filtered = gifts.filter(g => {
     if (fMonth !== "all" && g.month !== fMonth) return false;
@@ -1009,7 +1011,8 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
     if (fHQ !== "all" && g.hqName !== fHQ) return false;
     if (fStatus === "pending" && g.issued) return false;
     if (fStatus === "issued" && !g.issued) return false;
-    if (search && !`${g.doctorName} ${g.hqName} ${g.asmName} ${g.giftName} ${g.doctorMobile||""}`.toLowerCase().includes(search.toLowerCase())) return false;
+    if (fLocation !== "all" && (g.location||"") !== fLocation) return false;
+    if (search && !`${g.doctorName} ${g.hqName} ${g.asmName} ${g.giftName} ${g.location||""} ${g.doctorMobile||""}`.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
@@ -1041,6 +1044,10 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
           <option value="pending">Pending</option>
           <option value="issued">Issued</option>
         </select>
+        <select value={fLocation} onChange={e=>setFLocation(e.target.value)} className="inp" style={{maxWidth:160}}>
+          <option value="all">All Locations</option>
+          {locations.map(l=><option key={l}>{l}</option>)}
+        </select>
         <div className="flex-1"/>
         <button id="quick-add-gifts-btn" className="btn btn-primary text-xs" onClick={()=>{setEditG(null);setModal(true);}}>🎁 + New Gift Entry</button>
       </div>
@@ -1064,7 +1071,7 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
         <div className="overflow-x-auto">
           <table className="w-full tbl">
             <thead><tr>
-              <th>#</th><th>Month</th><th>ASM / HQ</th><th>Doctor</th><th>Gift</th><th>MRP</th><th>CRM</th><th>Plan Sales</th><th>Status</th><th>Actual Sales</th><th>ROI</th><th></th>
+              <th>#</th><th>Month</th><th>ASM / HQ</th><th>Doctor</th><th>Location</th><th>Gift</th><th>MRP</th><th>CRM</th><th>Plan Sales</th><th>Status</th><th>Actual Sales</th><th>ROI</th><th></th>
             </tr></thead>
             <tbody>
               {filtered.map((g, i) => {
@@ -1080,6 +1087,7 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
                       <div className="font-semibold">{g.doctorName}</div>
                       <div className="text-gray-400 text-xs">{g.speciality}</div>
                     </td>
+                    <td className="text-xs text-gray-600">{g.location||"—"}</td>
                     <td>
                       <div className="font-semibold text-xs">{g.giftName}</div>
                       {g.productName && <div className="text-xs text-indigo-500">{g.productName}</div>}
@@ -1895,7 +1903,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
 
   // Level label + subtitle right side
   tf(ctx,levelLabel,W-16,34,16,"900","#1e3a5f","right",580);
-  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.6",W-16,56,10,"600","#94a3b8","right");
+  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.7",W-16,56,10,"600","#94a3b8","right");
   y=80;
 
   // ── KPI STRIP ──
@@ -2077,7 +2085,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
     y+=32;
   }
   rect(ctx,0,y,W,38,"#f8fafc"); hline(ctx,y,"#e2e8f0",1);
-  tf(ctx,"GiftTrack v1.6  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
+  tf(ctx,"GiftTrack v1.7  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
   y+=38;
 
   // ── Crop and export ──
@@ -2161,7 +2169,7 @@ function App() {
 
   // Doctors
   const addDoctor    = d => { save({ ...data, doctors: [...(data.doctors||[]), d] }); notify("Doctor added!"); };
-  const editDoctor   = d => { save({ ...data, doctors: (data.doctors||[]).map(x=>x.id===d.id?d:x) }); notify("Doctor updated!"); };
+  const editDoctor   = d => { const exists=(data.doctors||[]).some(x=>x.id===d.id); const next=exists?(data.doctors||[]).map(x=>x.id===d.id?d:x):[...(data.doctors||[]),d]; save({...data,doctors:next}); notify("Doctor updated!"); };
   const deleteDoctor = id => { save({ ...data, doctors: (data.doctors||[]).filter(x=>x.id!==id) }); notify("Deleted","red"); };
 
   // Gift Items (master)
@@ -2225,7 +2233,7 @@ function App() {
             <div style={{ width: 1, height: 28, background: "#e2e8f0" }} className="desktop-nav"></div>
             <div>
               <div style={{ fontWeight: 900, fontSize: 15, color: "#1e3a5f", lineHeight: 1.1 }}>GiftTrack</div>
-              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.6 · Apr 2026</div>
+              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.7 · Apr 2026</div>
             </div>
           </div>
           {/* Desktop nav tabs */}
