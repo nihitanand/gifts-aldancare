@@ -2423,17 +2423,42 @@ function App() {
   const deleteGiftItem = id => { save({ ...data, giftItems: (data.giftItems||[]).filter(x => x.id!==id) }); notify("Deleted","red"); };
 
   // Gifts
-  const saveGift   = g => {
-    const exists = data.gifts.find(x => x.id===g.id);
-    const nextGifts = exists ? data.gifts.map(x => x.id===g.id ? g : x) : [...data.gifts, g];
-    save({ ...data, gifts: nextGifts });
-    notify(exists ? "Gift entry updated!" : "Gift entry saved!");
+  // Gifts — all write directly to gifts subpath to avoid stale full-PUT overwrite
+  const giftsRef = () => DB.ref(PATH + "/gifts");
+  const saveGift = g => {
+    setSyncSt("saving");
+    giftsRef().once("value").then(snap => {
+      const raw = snap.val();
+      const current = raw ? (Array.isArray(raw) ? raw : Object.values(raw)).filter(Boolean) : [];
+      const exists = current.find(x => x.id===g.id);
+      const next = exists ? current.map(x => x.id===g.id ? g : x) : [...current, g];
+      return giftsRef().set(next);
+    }).then(() => { setSyncSt("synced"); notify(g.id && data.gifts.find(x=>x.id===g.id) ? "Gift entry updated!" : "Gift entry saved!"); })
+    .catch(e => { console.error(e); setSyncSt("error"); });
   };
-  const bulkAddGifts  = entries => { save({ ...data, gifts: [...(data.gifts||[]), ...entries] }); };
-  const bulkEditGifts = (updatedGifts, count, giftName) => { save({ ...data, gifts: updatedGifts }); notify("✅ " + count + " entries updated to " + giftName); };
+  const bulkAddGifts = entries => {
+    setSyncSt("saving");
+    giftsRef().once("value").then(snap => {
+      const raw = snap.val();
+      const current = raw ? (Array.isArray(raw) ? raw : Object.values(raw)).filter(Boolean) : [];
+      return giftsRef().set([...current, ...entries]);
+    }).then(() => setSyncSt("synced"))
+    .catch(e => { console.error(e); setSyncSt("error"); });
+  };
+  const bulkEditGifts = (updatedGifts, count, giftName) => {
+    setSyncSt("saving");
+    giftsRef().set(updatedGifts)
+      .then(() => { setSyncSt("synced"); notify("✅ " + count + " entries updated to " + giftName); })
+      .catch(e => { console.error(e); setSyncSt("error"); });
+  };
   const deleteGift = id => {
-    save({ ...data, gifts: data.gifts.filter(x => x.id!==id) });
-    notify("Deleted", "red");
+    setSyncSt("saving");
+    giftsRef().once("value").then(snap => {
+      const raw = snap.val();
+      const current = raw ? (Array.isArray(raw) ? raw : Object.values(raw)).filter(Boolean) : [];
+      return giftsRef().set(current.filter(x => x.id!==id));
+    }).then(() => { setSyncSt("synced"); notify("Deleted","red"); })
+    .catch(e => { console.error(e); setSyncSt("error"); });
   };
 
   const handleShare = async (type, gifts, label, level, treeData) => {
