@@ -2356,6 +2356,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
 ══════════════════════════════════ */
 function App() {
   const [data, setData] = useState(null);
+  const dataRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
   const [syncSt, setSyncSt] = useState("connecting");
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -2423,27 +2424,24 @@ function App() {
   const deleteGiftItem = id => { save({ ...data, giftItems: (data.giftItems||[]).filter(x => x.id!==id) }); notify("Deleted","red"); };
 
   // Gifts
-  // Gifts — all write directly to gifts subpath to avoid stale full-PUT overwrite
+  // Gifts — use dataRef for always-current state, write only to gifts subpath
   const giftsRef = () => DB.ref(PATH + "/gifts");
+  const currentGifts = () => toArr((dataRef.current||data||{}).gifts).filter(Boolean);
   const saveGift = g => {
+    const cur = currentGifts();
+    const exists = cur.find(x => x.id===g.id);
+    const next = exists ? cur.map(x => x.id===g.id ? g : x) : [...cur, g];
     setSyncSt("saving");
-    giftsRef().once("value").then(snap => {
-      const raw = snap.val();
-      const current = raw ? (Array.isArray(raw) ? raw : Object.values(raw)).filter(Boolean) : [];
-      const exists = current.find(x => x.id===g.id);
-      const next = exists ? current.map(x => x.id===g.id ? g : x) : [...current, g];
-      return giftsRef().set(next);
-    }).then(() => { setSyncSt("synced"); notify(g.id && data.gifts.find(x=>x.id===g.id) ? "Gift entry updated!" : "Gift entry saved!"); })
-    .catch(e => { console.error(e); setSyncSt("error"); });
+    giftsRef().set(next)
+      .then(() => { setSyncSt("synced"); notify(exists ? "Gift entry updated!" : "Gift entry saved!"); })
+      .catch(e => { console.error(e); setSyncSt("error"); });
   };
   const bulkAddGifts = entries => {
+    const cur = currentGifts();
     setSyncSt("saving");
-    giftsRef().once("value").then(snap => {
-      const raw = snap.val();
-      const current = raw ? (Array.isArray(raw) ? raw : Object.values(raw)).filter(Boolean) : [];
-      return giftsRef().set([...current, ...entries]);
-    }).then(() => setSyncSt("synced"))
-    .catch(e => { console.error(e); setSyncSt("error"); });
+    giftsRef().set([...cur, ...entries])
+      .then(() => setSyncSt("synced"))
+      .catch(e => { console.error(e); setSyncSt("error"); });
   };
   const bulkEditGifts = (updatedGifts, count, giftName) => {
     setSyncSt("saving");
@@ -2452,13 +2450,11 @@ function App() {
       .catch(e => { console.error(e); setSyncSt("error"); });
   };
   const deleteGift = id => {
+    const cur = currentGifts();
     setSyncSt("saving");
-    giftsRef().once("value").then(snap => {
-      const raw = snap.val();
-      const current = raw ? (Array.isArray(raw) ? raw : Object.values(raw)).filter(Boolean) : [];
-      return giftsRef().set(current.filter(x => x.id!==id));
-    }).then(() => { setSyncSt("synced"); notify("Deleted","red"); })
-    .catch(e => { console.error(e); setSyncSt("error"); });
+    giftsRef().set(cur.filter(x => x.id!==id))
+      .then(() => { setSyncSt("synced"); notify("Deleted","red"); })
+      .catch(e => { console.error(e); setSyncSt("error"); });
   };
 
   const handleShare = async (type, gifts, label, level, treeData) => {
