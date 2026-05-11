@@ -2424,36 +2424,46 @@ function App() {
   const deleteGiftItem = id => { save({ ...data, giftItems: (data.giftItems||[]).filter(x => x.id!==id) }); notify("Deleted","red"); };
 
   // Gifts
-  // Gifts — use Firebase transaction to guarantee atomic read-modify-write
+  // Gifts — push() for new adds (atomic append), fresh-read+set for edits/deletes
   const giftsRef = () => DB.ref(PATH + "/gifts");
-  const txGifts = (mutateFn, onDone) => {
-    setSyncSt("saving");
-    giftsRef().transaction(current => {
-      const arr = toArr(current).filter(Boolean);
-      return mutateFn(arr);
-    }, (err, committed) => {
-      if (err || !committed) { console.error("tx failed", err); setSyncSt("error"); }
-      else { setSyncSt("synced"); if (onDone) onDone(); }
-    });
-  };
   const saveGift = g => {
-    const isEdit = !!(data.gifts||[]).find(x=>x.id===g.id);
-    txGifts(arr => {
-      const exists = arr.find(x=>x.id===g.id);
-      return exists ? arr.map(x=>x.id===g.id?g:x) : [...arr, g];
-    }, () => notify(isEdit ? "Gift entry updated!" : "Gift entry saved!"));
+    const exists = (data.gifts||[]).find(x=>x.id===g.id);
+    if (!exists) {
+      setSyncSt("saving");
+      giftsRef().push(g)
+        .then(()=>{ setSyncSt("synced"); notify("Gift entry saved!"); })
+        .catch(e=>{ console.error(e); setSyncSt("error"); });
+    } else {
+      setSyncSt("saving");
+      giftsRef().once("value").then(snap=>{
+        const arr = toArr(snap.val()).filter(Boolean);
+        return giftsRef().set(arr.map(x=>x.id===g.id?g:x));
+      }).then(()=>{ setSyncSt("synced"); notify("Gift entry updated!"); })
+      .catch(e=>{ console.error(e); setSyncSt("error"); });
+    }
   };
   const bulkAddGifts = (entries) => {
-    txGifts(arr => [...arr, ...entries]);
+    setSyncSt("saving");
+    Promise.all(entries.map(e=>giftsRef().push(e)))
+      .then(()=>setSyncSt("synced"))
+      .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
   const bulkEditGifts = (updatedGifts, count, giftName) => {
     setSyncSt("saving");
-    giftsRef().set(updatedGifts)
-      .then(() => { setSyncSt("synced"); notify("✅ " + count + " entries updated to " + giftName); })
-      .catch(e => { console.error(e); setSyncSt("error"); });
+    giftsRef().once("value").then(snap=>{
+      const arr = toArr(snap.val()).filter(Boolean);
+      const idMap = new Map(updatedGifts.map(u=>[u.id,u]));
+      return giftsRef().set(arr.map(x=>idMap.has(x.id)?idMap.get(x.id):x));
+    }).then(()=>{ setSyncSt("synced"); notify("✅ "+count+" entries updated to "+giftName); })
+    .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
   const deleteGift = id => {
-    txGifts(arr => arr.filter(x=>x.id!==id), () => notify("Deleted","red"));
+    setSyncSt("saving");
+    giftsRef().once("value").then(snap=>{
+      const arr = toArr(snap.val()).filter(Boolean);
+      return giftsRef().set(arr.filter(x=>x.id!==id));
+    }).then(()=>{ setSyncSt("synced"); notify("Deleted","red"); })
+    .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
 
   const handleShare = async (type, gifts, label, level, treeData) => {
