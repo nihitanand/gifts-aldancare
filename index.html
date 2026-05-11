@@ -2378,13 +2378,7 @@ function App() {
     save({ ...data, gifts: nextGifts });
     notify(exists ? "Gift entry updated!" : "Gift entry saved!");
   };
-  const bulkAddGifts = entries => {
-    const updatedGifts = [...toArr(data.gifts).filter(Boolean), ...entries];
-    setSyncSt("saving");
-    DB.ref(PATH + "/gifts").set(updatedGifts)
-      .then(() => { setSyncSt("synced"); notify("✅ " + entries.length + " entries copied!"); })
-      .catch(e => { console.error("bulkAdd error:", e); setSyncSt("error"); notify("Copy failed — try again", "red"); });
-  };
+  const bulkAddGifts = entries => { save({ ...data, gifts: [...(data.gifts||[]), ...entries] }); };
   const deleteGift = id => {
     save({ ...data, gifts: data.gifts.filter(x => x.id!==id) });
     notify("Deleted", "red");
