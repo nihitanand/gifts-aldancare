@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎁 GiftTrack v1.8 – Aldan Healthcare</title>
+  <title>🎁 GiftTrack v1.9 – Aldan Healthcare</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -521,7 +521,28 @@ function GiftModal({ open, onClose, onSave, initial, products, doctors, gifts, g
           )}
           {tab === "actual" && (
             <div className="space-y-4">
-              {/* Summary strip */}
+              {/* Bulk Gift Modal */}
+      {bulkGiftModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(15,23,42,0.65)"}}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="text-base font-bold text-gray-800">🎁 Change Gift for {bulkSelCount} doctor{bulkSelCount===1?"":"s"}</h2>
+            <div>
+              <div className="section-label">Select New Gift</div>
+              <select value={bulkGiftId} onChange={e=>setBulkGiftId(e.target.value)} className="inp">
+                <option value="">— Pick from Gift Master —</option>
+                {(giftItems||[]).map(gi=><option key={gi.id} value={gi.id}>{gi.name} · ₹{gi.mrp}</option>)}
+              </select>
+              {bulkGiftId && (()=>{ const gi=(giftItems||[]).find(x=>x.id===bulkGiftId); return gi?<div style={{marginTop:6,padding:"6px 10px",background:"#f0fdf4",borderRadius:8,fontSize:12,color:"#166534",fontWeight:700}}>✓ {gi.name} · ₹{gi.mrp}</div>:null; })()}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={()=>{setBulkGiftModal(false);setBulkGiftId("");}} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold">Cancel</button>
+              <button onClick={applyBulkGift} disabled={!bulkGiftId} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold disabled:opacity-40">✓ Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Summary strip */}
               <div style={{background:"#f0f9ff",borderRadius:12,padding:"12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:13}}>
                 <div><span style={{color:"#94a3b8",fontWeight:600}}>Doctor: </span><strong>{form.doctorName||"—"}</strong></div>
                 <div><span style={{color:"#94a3b8",fontWeight:600}}>Gift: </span><strong>{form.giftName||"—"}</strong>{form.giftMrp?<span style={{color:"#4338ca",fontWeight:800}}> ({fmt(form.giftMrp)})</span>:""}</div>
@@ -1012,7 +1033,7 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
 
   const tgtMonth = monthInputToLabel(tgtInput);
   const srcGifts = (gifts||[]).filter(g=>g.month===srcMonth);
-  const existInTgt = new Set((gifts||[]).filter(g=>g.month===tgtMonth).map(g=>(g.doctorName||"").toLowerCase()));
+  const existInTgt = new Set((gifts||[]).filter(g=>g.month===tgtMonth).map(g=>(g.doctorName||"").toLowerCase()+"||"+(g.hqName||"").toLowerCase());
   const hqsInSrc = [...new Set(srcGifts.map(g=>g.hqName).filter(Boolean))].sort();
   const activeHQs = Object.keys(selHQs).filter(h=>selHQs[h]);
   const visibleGifts = srcGifts.filter(g=>{
@@ -1020,17 +1041,17 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
     if(activeHQs.length>0 && !activeHQs.includes(g.hqName)) return false;
     return true;
   });
-  const allChk = visibleGifts.length>0 && visibleGifts.every(g=>selected[g.id]||existInTgt.has((g.doctorName||"").toLowerCase()));
+  const allChk = visibleGifts.length>0 && visibleGifts.every(g=>selected[g.id]||existInTgt.has(((g.doctorName||"").toLowerCase()+"||"+(g.hqName||"").toLowerCase())));
   const selIds = visibleGifts.filter(g=>selected[g.id]).map(g=>g.id);
-  const skipped = selIds.filter(id=>{ const g=srcGifts.find(x=>x.id===id); return g&&existInTgt.has((g.doctorName||"").toLowerCase()); }).length;
+  const skipped = selIds.filter(id=>{ const g=srcGifts.find(x=>x.id===id); return g&&existInTgt.has(((g.doctorName||"").toLowerCase()+"||"+(g.hqName||"").toLowerCase())); }).length;
   const willCopy = selIds.length - skipped;
   const sameMonth = tgtMonth && tgtMonth===srcMonth;
   const selGift = (giftItems||[]).find(gi=>gi.id===selGiftId);
 
   const toggleAll = () => {
-    const anyUnchecked = visibleGifts.some(g=>!selected[g.id]&&!existInTgt.has((g.doctorName||"").toLowerCase()));
+    const anyUnchecked = visibleGifts.some(g=>!selected[g.id]&&!existInTgt.has(((g.doctorName||"").toLowerCase()+"||"+(g.hqName||"").toLowerCase())));
     if (anyUnchecked) {
-      setSelected(s=>{ const n={...s}; visibleGifts.forEach(g=>{ if(!existInTgt.has((g.doctorName||"").toLowerCase())) n[g.id]=true; }); return n; });
+      setSelected(s=>{ const n={...s}; visibleGifts.forEach(g=>{ if(!existInTgt.has(((g.doctorName||"").toLowerCase()+"||"+(g.hqName||"").toLowerCase()))) n[g.id]=true; }); return n; });
     } else {
       setSelected(s=>{ const n={...s}; visibleGifts.forEach(g=>{ delete n[g.id]; }); return n; });
     }
@@ -1040,7 +1061,7 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
   const handleCopy = () => {
     if (!selGift || !willCopy || !tgtMonth || sameMonth) return;
     const visibleIds = new Set(visibleGifts.map(g=>g.id));
-    const toCopy = srcGifts.filter(g=>visibleIds.has(g.id)&&selected[g.id]&&!existInTgt.has((g.doctorName||"").toLowerCase()));
+    const toCopy = srcGifts.filter(g=>visibleIds.has(g.id)&&selected[g.id]&&!existInTgt.has(((g.doctorName||"").toLowerCase()+"||"+(g.hqName||"").toLowerCase())));
     const entries = toCopy.map(g=>({...g,
       id: uid(),
       month: tgtMonth,
@@ -1149,7 +1170,7 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
               <div style={{maxHeight:220,overflowY:"auto",border:"1px solid #e5e7eb",borderRadius:10}}>
                 {visibleGifts.length===0 && <div className="text-center py-6 text-gray-300 text-sm">No doctors match</div>}
                 {visibleGifts.map(g=>{
-                  const exists = existInTgt.has((g.doctorName||"").toLowerCase());
+                  const exists = existInTgt.has(((g.doctorName||"").toLowerCase()+"||"+(g.hqName||"").toLowerCase()));
                   return (
                     <label key={g.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderBottom:"1px solid #f3f4f6",cursor:exists?"default":"pointer",background:exists?"#f9fafb":"white",opacity:exists?0.45:1}}>
                       <input type="checkbox" checked={!!selected[g.id]} onChange={()=>{ if(!exists) setSelected(s=>({...s,[g.id]:!s[g.id]})); }} className="w-4 h-4 accent-indigo-600" disabled={exists}/>
@@ -1183,9 +1204,13 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
 }
 
 
-function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit, onDelete, onIssue, onBulkAdd }) {
+function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit, onDelete, onIssue, onBulkAdd, onBulkEdit }) {
   const [search, setSearch] = useState("");
   const [copyModal, setCopyModal] = useState(false);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSel, setBulkSel] = useState({});
+  const [bulkGiftModal, setBulkGiftModal] = useState(false);
+  const [bulkGiftId, setBulkGiftId] = useState("");
   const [fMonth, setFMonth] = useState("all");
   const [fAsm, setFAsm] = useState("all");
   const [fHQ, setFHQ] = useState("all");
@@ -1210,6 +1235,20 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
   });
 
   const planTotal = filtered.reduce((s,g)=>s+Number(g.giftMrp||0),0);
+  const bulkSelCount = filtered.filter(g=>bulkSel[g.id]).length;
+  const allBulkChk = filtered.length>0 && filtered.every(g=>bulkSel[g.id]);
+  const toggleBulkAll = () => {
+    if (allBulkChk) { setBulkSel({}); }
+    else { const s={}; filtered.forEach(g=>{ s[g.id]=true; }); setBulkSel(s); }
+  };
+  const applyBulkGift = () => {
+    const gi = (giftItems||[]).find(x=>x.id===bulkGiftId);
+    if (!gi) return;
+    const ids = new Set(filtered.filter(g=>bulkSel[g.id]).map(g=>g.id));
+    const updatedGifts = gifts.map(g=> ids.has(g.id) ? {...g, giftName:gi.name, giftMrp:gi.mrp, giftPhotoUrl:gi.photoUrl||""} : g);
+    onBulkEdit(updatedGifts, ids.size, gi.name);
+    setBulkMode(false); setBulkSel({}); setBulkGiftId(""); setBulkGiftModal(false);
+  };
   const actTotal  = filtered.filter(g=>g.issued).reduce((s,g)=>s+Number(g.giftMrp||0),0);
 
   return (
@@ -1244,8 +1283,41 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
         </select>
         <div className="flex-1"/>
         <button onClick={()=>setCopyModal(true)} style={{background:"#ede9fe",color:"#5b21b6",border:"1px solid #c4b5fd",borderRadius:8,padding:"6px 14px",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>📋 Copy Month</button>
+        <button onClick={()=>{setBulkMode(m=>!m);setBulkSel({});}} style={{background:bulkMode?"#1e3a5f":"white",color:bulkMode?"white":"#1e3a5f",border:"1px solid #1e3a5f",borderRadius:8,padding:"6px 14px",fontWeight:800,fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>
+          {bulkMode?"✕ Cancel Select":"☑ Bulk Select"}
+        </button>
         <button id="quick-add-gifts-btn" className="btn btn-primary text-xs" onClick={()=>{setEditG(null);setModal(true);}}>🎁 + New Gift Entry</button>
       </div>
+
+      {/* Bulk Gift Modal */}
+      {bulkGiftModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:"rgba(15,23,42,0.65)"}}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="text-base font-bold text-gray-800">🎁 Change Gift for {bulkSelCount} doctor{bulkSelCount===1?"":"s"}</h2>
+            <div>
+              <div className="section-label">Select New Gift</div>
+              <select value={bulkGiftId} onChange={e=>setBulkGiftId(e.target.value)} className="inp">
+                <option value="">— Pick from Gift Master —</option>
+                {(giftItems||[]).map(gi=><option key={gi.id} value={gi.id}>{gi.name} · ₹{gi.mrp}</option>)}
+              </select>
+              {bulkGiftId && (()=>{ const gi=(giftItems||[]).find(x=>x.id===bulkGiftId); return gi?<div style={{marginTop:6,padding:"6px 10px",background:"#f0fdf4",borderRadius:8,fontSize:12,color:"#166534",fontWeight:700}}>✓ {gi.name} · ₹{gi.mrp}</div>:null; })()}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={()=>{setBulkGiftModal(false);setBulkGiftId("");}} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold">Cancel</button>
+              <button onClick={applyBulkGift} disabled={!bulkGiftId} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold disabled:opacity-40">✓ Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk action bar */}
+      {bulkMode && bulkSelCount>0 && (
+        <div style={{position:"sticky",bottom:0,zIndex:30,background:"#1e3a5f",borderRadius:12,padding:"12px 16px",marginBottom:8,display:"flex",alignItems:"center",gap:12,boxShadow:"0 -2px 16px rgba(0,0,0,0.15)"}}>
+          <div style={{flex:1,color:"white",fontWeight:800,fontSize:13}}>{bulkSelCount} doctor{bulkSelCount===1?"":"s"} selected</div>
+          <button onClick={()=>{setBulkSel({});}} style={{background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.3)",color:"white",borderRadius:8,padding:"6px 12px",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>Clear</button>
+          <button onClick={()=>setBulkGiftModal(true)} style={{background:"#6366f1",border:"none",color:"white",borderRadius:8,padding:"8px 16px",fontSize:13,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>🎁 Change Gift</button>
+        </div>
+      )}
 
       {/* Summary strip */}
       <div className="grid grid-cols-4 gap-3 mb-4">
@@ -1266,7 +1338,7 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
         <div className="overflow-x-auto">
           <table className="w-full tbl">
             <thead><tr>
-              <th>#</th><th>Month</th><th>ASM / HQ</th><th>Doctor</th><th>Location</th><th>Gift</th><th>MRP</th><th>CRM</th><th>Plan Sales</th><th>Status</th><th>Actual Sales</th><th>ROI</th><th></th>
+              {bulkMode && <th><input type="checkbox" checked={allBulkChk} onChange={toggleBulkAll} className="w-4 h-4 accent-indigo-600"/></th>}<th>#</th><th>Month</th><th>ASM / HQ</th><th>Doctor</th><th>Location</th><th>Gift</th><th>MRP</th><th>CRM</th><th>Plan Sales</th><th>Status</th><th>Actual Sales</th><th>ROI</th><th></th>
             </tr></thead>
             <tbody>
               {filtered.map((g, i) => {
@@ -2098,7 +2170,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
 
   // Level label + subtitle right side
   tf(ctx,levelLabel,W-16,34,16,"900","#1e3a5f","right",580);
-  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.8",W-16,56,10,"600","#94a3b8","right");
+  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.9",W-16,56,10,"600","#94a3b8","right");
   y=80;
 
   // ── KPI STRIP ──
@@ -2280,7 +2352,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
     y+=32;
   }
   rect(ctx,0,y,W,38,"#f8fafc"); hline(ctx,y,"#e2e8f0",1);
-  tf(ctx,"GiftTrack v1.8  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
+  tf(ctx,"GiftTrack v1.9  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
   y+=38;
 
   // ── Crop and export ──
@@ -2379,7 +2451,8 @@ function App() {
     save({ ...data, gifts: nextGifts });
     notify(exists ? "Gift entry updated!" : "Gift entry saved!");
   };
-  const bulkAddGifts = entries => { save({ ...data, gifts: [...(data.gifts||[]), ...entries] }); };
+  const bulkAddGifts  = entries => { save({ ...data, gifts: [...(data.gifts||[]), ...entries] }); };
+  const bulkEditGifts = (updatedGifts, count, giftName) => { save({ ...data, gifts: updatedGifts }); notify("✅ " + count + " entries updated to " + giftName); };
   const deleteGift = id => {
     save({ ...data, gifts: data.gifts.filter(x => x.id!==id) });
     notify("Deleted", "red");
@@ -2429,7 +2502,7 @@ function App() {
             <div style={{ width: 1, height: 28, background: "#e2e8f0" }} className="desktop-nav"></div>
             <div>
               <div style={{ fontWeight: 900, fontSize: 15, color: "#1e3a5f", lineHeight: 1.1 }}>GiftTrack</div>
-              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.8 · Apr 2026</div>
+              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.9 · Apr 2026</div>
             </div>
           </div>
           {/* Desktop nav tabs */}
@@ -2468,7 +2541,7 @@ function App() {
         {activeTab === "dashboard" && <Dashboard gifts={data.gifts} onShare={handleShare}/>}
         {activeTab === "gifts" && (
           <GiftsTable gifts={data.gifts} products={data.products} giftItems={data.giftItems||[]} doctors={data.doctors||[]}
-            onEdit={saveGift} onDelete={deleteGift} onIssue={saveGift} onBulkAdd={bulkAddGifts}/>
+            onEdit={saveGift} onDelete={deleteGift} onIssue={saveGift} onBulkAdd={bulkAddGifts} onBulkEdit={bulkEditGifts}/>
         )}
         {activeTab === "giftmaster" && <GiftMaster giftItems={data.giftItems||[]} onAdd={addGiftItem} onEdit={editGiftItem} onDelete={deleteGiftItem}/>}
         {activeTab === "doctors" && <DoctorMaster gifts={data.gifts} doctors={data.doctors||[]} onAdd={addDoctor} onEdit={editDoctor} onDelete={deleteDoctor}/>}
