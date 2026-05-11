@@ -2424,24 +2424,27 @@ function App() {
   const deleteGiftItem = id => { save({ ...data, giftItems: (data.giftItems||[]).filter(x => x.id!==id) }); notify("Deleted","red"); };
 
   // Gifts
-  // Gifts — use dataRef for always-current state, write only to gifts subpath
+  // Gifts — use Firebase transaction to guarantee atomic read-modify-write
   const giftsRef = () => DB.ref(PATH + "/gifts");
-  const currentGifts = () => toArr((dataRef.current||data||{}).gifts).filter(Boolean);
-  const saveGift = g => {
-    const cur = currentGifts();
-    const exists = cur.find(x => x.id===g.id);
-    const next = exists ? cur.map(x => x.id===g.id ? g : x) : [...cur, g];
+  const txGifts = (mutateFn, onDone) => {
     setSyncSt("saving");
-    giftsRef().set(next)
-      .then(() => { setSyncSt("synced"); notify(exists ? "Gift entry updated!" : "Gift entry saved!"); })
-      .catch(e => { console.error(e); setSyncSt("error"); });
+    giftsRef().transaction(current => {
+      const arr = toArr(current).filter(Boolean);
+      return mutateFn(arr);
+    }, (err, committed) => {
+      if (err || !committed) { console.error("tx failed", err); setSyncSt("error"); }
+      else { setSyncSt("synced"); if (onDone) onDone(); }
+    });
   };
-  const bulkAddGifts = entries => {
-    const cur = currentGifts();
-    setSyncSt("saving");
-    giftsRef().set([...cur, ...entries])
-      .then(() => setSyncSt("synced"))
-      .catch(e => { console.error(e); setSyncSt("error"); });
+  const saveGift = g => {
+    const isEdit = !!(data.gifts||[]).find(x=>x.id===g.id);
+    txGifts(arr => {
+      const exists = arr.find(x=>x.id===g.id);
+      return exists ? arr.map(x=>x.id===g.id?g:x) : [...arr, g];
+    }, () => notify(isEdit ? "Gift entry updated!" : "Gift entry saved!"));
+  };
+  const bulkAddGifts = (entries) => {
+    txGifts(arr => [...arr, ...entries]);
   };
   const bulkEditGifts = (updatedGifts, count, giftName) => {
     setSyncSt("saving");
@@ -2450,11 +2453,7 @@ function App() {
       .catch(e => { console.error(e); setSyncSt("error"); });
   };
   const deleteGift = id => {
-    const cur = currentGifts();
-    setSyncSt("saving");
-    giftsRef().set(cur.filter(x => x.id!==id))
-      .then(() => { setSyncSt("synced"); notify("Deleted","red"); })
-      .catch(e => { console.error(e); setSyncSt("error"); });
+    txGifts(arr => arr.filter(x=>x.id!==id), () => notify("Deleted","red"));
   };
 
   const handleShare = async (type, gifts, label, level, treeData) => {
