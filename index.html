@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎁 GiftTrack v1.7 – Aldan Healthcare</title>
+  <title>🎁 GiftTrack v1.8 – Aldan Healthcare</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -990,7 +990,156 @@ function ProductMaster({ products, onAdd, onEdit, onDelete }) {
 /* ══════════════════════════════════
    GIFTS TABLE
 ══════════════════════════════════ */
-function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit, onDelete, onIssue }) {
+
+/* ══════════════════════════════════
+   COPY MONTH MODAL
+══════════════════════════════════ */
+function CopyMonthModal({ open, onClose, gifts, onCopy }) {
+  const months = [...new Set(gifts.map(g=>g.month).filter(Boolean))].sort();
+  const [srcMonth, setSrcMonth] = useState(months[months.length-1]||"");
+  const [tgtInput, setTgtInput] = useState(CUR_MONTH_INPUT);
+  const [selected, setSelected] = useState({});
+  const [copying, setCopying] = useState(false);
+
+  // When source month changes, re-select all doctors in that month
+  useEffect(()=>{
+    if(!srcMonth) return;
+    const srcGifts = gifts.filter(g=>g.month===srcMonth);
+    const sel = {};
+    srcGifts.forEach(g=>{ sel[g.id]=true; });
+    setSelected(sel);
+  }, [srcMonth, open]);
+
+  if(!open) return null;
+
+  const srcGifts = gifts.filter(g=>g.month===srcMonth);
+  const tgtMonth = monthInputToLabel(tgtInput);
+  const existingInTarget = new Set(gifts.filter(g=>g.month===tgtMonth).map(g=>g.doctorName?.toLowerCase()));
+  const selectedIds = Object.keys(selected).filter(id=>selected[id]);
+  const selectedCount = selectedIds.length;
+  const allSelected = srcGifts.length>0 && srcGifts.every(g=>selected[g.id]);
+
+  const toggleAll = () => {
+    const sel = {};
+    if(!allSelected) srcGifts.forEach(g=>{ sel[g.id]=true; });
+    setSelected(sel);
+  };
+
+  const toggle = (id) => setSelected(s=>({...s,[id]:!s[id]}));
+
+  const handleCopy = () => {
+    if(!selectedCount || !tgtMonth || tgtMonth===srcMonth) return;
+    setCopying(true);
+    const toCopy = srcGifts.filter(g=>selected[g.id] && !existingInTarget.has(g.doctorName?.toLowerCase()));
+    const newEntries = toCopy.map(g=>({
+      ...g,
+      id: uid(),
+      month: tgtMonth,
+      issued: false,
+      issueDate: "",
+      issuedPhotoUrl: "",
+      actualSales:    [{id:uid(),prod:"",qty:"",ptr:"",amt:""}],
+      crmActualSales: [{id:uid(),prod:"",qty:"",ptr:"",amt:""}],
+      giftActualSales:[{id:uid(),prod:"",qty:"",ptr:"",amt:""}],
+      createdAt: new Date().toISOString(),
+    }));
+    onCopy(newEntries, tgtMonth, toCopy.length, selectedCount-toCopy.length);
+    setCopying(false);
+    onClose();
+  };
+
+  const skipped = selectedIds.filter(id=>{
+    const g=srcGifts.find(x=>x.id===id);
+    return g && existingInTarget.has(g.doctorName?.toLowerCase());
+  }).length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto" style={{background:"rgba(15,23,42,0.65)"}}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-6">
+        <div className="flex justify-between items-center px-6 pt-5 pb-4 border-b border-gray-100">
+          <h2 className="text-base font-bold text-gray-800">📋 Copy Month Entries</h2>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-700 text-xl font-bold">✕</button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+
+          {/* Source + Target */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <div className="section-label">Source Month</div>
+              <select value={srcMonth} onChange={e=>setSrcMonth(e.target.value)} className="inp">
+                <option value="">— Select —</option>
+                {months.map(m=><option key={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="section-label">Target Month</div>
+              <input type="month" value={tgtInput} onChange={e=>setTgtInput(e.target.value)} className="inp mono"/>
+            </div>
+          </div>
+
+          {tgtMonth && tgtMonth===srcMonth && (
+            <div style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#dc2626",fontWeight:600}}>
+              ⚠️ Source and target month are the same. Please choose a different target month.
+            </div>
+          )}
+
+          {/* Doctor checklist */}
+          {srcGifts.length>0 && (
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <div className="section-label" style={{marginBottom:0}}>{srcGifts.length} doctors in {srcMonth}</div>
+                <button onClick={toggleAll} style={{fontSize:11,fontWeight:800,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit"}}>
+                  {allSelected?"☑ Deselect All":"☐ Select All"}
+                </button>
+              </div>
+              <div style={{maxHeight:300,overflowY:"auto",border:"1px solid #e5e7eb",borderRadius:10}}>
+                {srcGifts.map(g=>{
+                  const alreadyExists = existingInTarget.has(g.doctorName?.toLowerCase());
+                  return (
+                    <label key={g.id} style={{
+                      display:"flex",alignItems:"center",gap:10,padding:"8px 12px",
+                      borderBottom:"1px solid #f3f4f6",cursor:"pointer",
+                      background: alreadyExists?"#f9fafb":"white",
+                      opacity: alreadyExists?0.5:1
+                    }}>
+                      <input type="checkbox" checked={!!selected[g.id]} onChange={()=>toggle(g.id)}
+                        className="w-4 h-4 accent-indigo-600" disabled={alreadyExists}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:700,fontSize:13,color:"#1f2937"}}>{g.doctorName}</div>
+                        <div style={{fontSize:11,color:"#9ca3af"}}>{g.hqName} · {g.giftName} · {fmt(g.giftMrp)}</div>
+                      </div>
+                      {alreadyExists && <span style={{fontSize:10,fontWeight:700,color:"#6b7280",background:"#f3f4f6",padding:"2px 6px",borderRadius:4,whiteSpace:"nowrap"}}>Already in {tgtMonth}</span>}
+                    </label>
+                  );
+                })}
+              </div>
+              {skipped>0 && (
+                <div style={{fontSize:11,color:"#92400e",marginTop:6,fontWeight:600}}>
+                  ⚠️ {skipped} selected doctor(s) already exist in {tgtMonth} and will be skipped.
+                </div>
+              )}
+            </div>
+          )}
+
+          {srcGifts.length===0 && srcMonth && (
+            <div className="text-center py-6 text-gray-300 text-sm">No entries in {srcMonth}</div>
+          )}
+
+        </div>
+        <div className="flex gap-3 px-6 pb-5">
+          <button onClick={onClose} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-200">Cancel</button>
+          <button onClick={handleCopy}
+            disabled={!selectedCount||!tgtMonth||tgtMonth===srcMonth||copying||(selectedCount-skipped===0)}
+            className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-40">
+            {copying?"Copying…":`📋 Copy ${selectedCount-skipped} Entr${selectedCount-skipped===1?"y":"ies"}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit, onDelete, onIssue, onBulkAdd, notify }) {
   const [search, setSearch] = useState("");
   const [fMonth, setFMonth] = useState("all");
   const [fAsm, setFAsm] = useState("all");
@@ -1000,6 +1149,7 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
   const [modal, setModal] = useState(false);
   const [editG, setEditG] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  const [copyModal, setCopyModal] = useState(false);
 
   const months    = [...new Set(gifts.map(g=>g.month).filter(Boolean))].sort();
   const locations = [...new Set(gifts.map(g=>g.location).filter(Boolean))].sort();
@@ -1021,6 +1171,8 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
   return (
     <div>
       <GiftModal open={modal} onClose={()=>{setModal(false);setEditG(null);}} onSave={g=>editG?onEdit(g):onIssue(g)} initial={editG} products={products} doctors={data_doctors||[]} gifts={gifts} giftItems={giftItems||[]}/>
+      <CopyMonthModal open={copyModal} onClose={()=>setCopyModal(false)} gifts={gifts}
+        onCopy={(entries,tgtMonth,copied,skipped)=>{ onBulkAdd(entries); if(notify) notify(`✅ Copied ${copied} entr${copied===1?"y":"ies"} to ${tgtMonth}${skipped>0?` (${skipped} skipped)`:""}`); }}/>
       <Confirm open={!!confirm} msg="Delete this gift entry?" onOk={()=>{onDelete(confirm);setConfirm(null);}} onCancel={()=>setConfirm(null)}/>
 
       {/* Filters */}
@@ -1048,6 +1200,7 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
           {locations.map(l=><option key={l}>{l}</option>)}
         </select>
         <div className="flex-1"/>
+        <button onClick={()=>setCopyModal(true)} className="btn text-xs" style={{background:"#ede9fe",color:"#5b21b6",border:"1px solid #c4b5fd",fontWeight:700}}>📋 Copy Month</button>
         <button id="quick-add-gifts-btn" className="btn btn-primary text-xs" onClick={()=>{setEditG(null);setModal(true);}}>🎁 + New Gift Entry</button>
       </div>
 
@@ -1902,7 +2055,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
 
   // Level label + subtitle right side
   tf(ctx,levelLabel,W-16,34,16,"900","#1e3a5f","right",580);
-  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.7",W-16,56,10,"600","#94a3b8","right");
+  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.8",W-16,56,10,"600","#94a3b8","right");
   y=80;
 
   // ── KPI STRIP ──
@@ -2084,7 +2237,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
     y+=32;
   }
   rect(ctx,0,y,W,38,"#f8fafc"); hline(ctx,y,"#e2e8f0",1);
-  tf(ctx,"GiftTrack v1.7  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
+  tf(ctx,"GiftTrack v1.8  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
   y+=38;
 
   // ── Crop and export ──
@@ -2169,6 +2322,7 @@ function App() {
   // Doctors
   const addDoctor    = d => { save({ ...data, doctors: [...(data.doctors||[]), d] }); notify("Doctor added!"); };
   const editDoctor   = d => { const exists=(data.doctors||[]).some(x=>x.id===d.id); const next=exists?(data.doctors||[]).map(x=>x.id===d.id?d:x):[...(data.doctors||[]),d]; save({...data,doctors:next}); notify("Doctor updated!"); };
+  const bulkAddGifts = (entries) => { save({...data, gifts:[...(data.gifts||[]), ...entries]}); };
   const deleteDoctor = id => { save({ ...data, doctors: (data.doctors||[]).filter(x=>x.id!==id) }); notify("Deleted","red"); };
 
   // Gift Items (master)
@@ -2232,7 +2386,7 @@ function App() {
             <div style={{ width: 1, height: 28, background: "#e2e8f0" }} className="desktop-nav"></div>
             <div>
               <div style={{ fontWeight: 900, fontSize: 15, color: "#1e3a5f", lineHeight: 1.1 }}>GiftTrack</div>
-              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.7 · Apr 2026</div>
+              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.8 · Apr 2026</div>
             </div>
           </div>
           {/* Desktop nav tabs */}
@@ -2271,8 +2425,8 @@ function App() {
         {activeTab === "dashboard" && <Dashboard gifts={data.gifts} onShare={handleShare}/>}
         {activeTab === "gifts" && (
           <GiftsTable gifts={data.gifts} products={data.products} giftItems={data.giftItems||[]} doctors={data.doctors||[]}
-            onEdit={saveGift} onDelete={deleteGift} onIssue={saveGift}/>
-        )}
+           <GiftsTable gifts={data.gifts} products={data.products} giftItems={data.giftItems||[]} doctors={data.doctors||[]}
+             onEdit={saveGift} onDelete={deleteGift} onIssue={saveGift} onBulkAdd={bulkAddGifts} notify={notify}/>
         {activeTab === "giftmaster" && <GiftMaster giftItems={data.giftItems||[]} onAdd={addGiftItem} onEdit={editGiftItem} onDelete={deleteGiftItem}/>}
         {activeTab === "doctors" && <DoctorMaster gifts={data.gifts} doctors={data.doctors||[]} onAdd={addDoctor} onEdit={editDoctor} onDelete={deleteDoctor}/>}
         {activeTab === "products" && (
