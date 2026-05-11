@@ -996,7 +996,9 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
   const [tgtInput, setTgtInput] = useState(CUR_MONTH_INPUT);
   const [selected, setSelected] = useState({});
   const [selGiftId, setSelGiftId] = useState("");
-  const [lastCopied, setLastCopied] = useState(null); // {count, month} for toast
+  const [lastCopied, setLastCopied] = useState(null);
+  const [docSearch, setDocSearch] = useState("");
+  const [selHQs, setSelHQs] = useState({});
 
   useEffect(() => {
     const sg = (gifts||[]).filter(g=>g.month===srcMonth);
@@ -1004,12 +1006,21 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
     sg.forEach(g => { sel[g.id] = true; });
     setSelected(sel);
     setLastCopied(null);
+    setDocSearch("");
+    setSelHQs({});
   }, [srcMonth]);
 
   const tgtMonth = monthInputToLabel(tgtInput);
   const srcGifts = (gifts||[]).filter(g=>g.month===srcMonth);
   const existInTgt = new Set((gifts||[]).filter(g=>g.month===tgtMonth).map(g=>(g.doctorName||"").toLowerCase()));
-  const allChk = srcGifts.length>0 && srcGifts.every(g=>selected[g.id]||existInTgt.has((g.doctorName||"").toLowerCase()));
+  const hqsInSrc = [...new Set(srcGifts.map(g=>g.hqName).filter(Boolean))].sort();
+  const activeHQs = Object.keys(selHQs).filter(h=>selHQs[h]);
+  const visibleGifts = srcGifts.filter(g=>{
+    if(docSearch && !(g.doctorName||"").toLowerCase().includes(docSearch.toLowerCase())) return false;
+    if(activeHQs.length>0 && !activeHQs.includes(g.hqName)) return false;
+    return true;
+  });
+  const allChk = visibleGifts.length>0 && visibleGifts.every(g=>selected[g.id]||existInTgt.has((g.doctorName||"").toLowerCase()));
   const selIds = Object.keys(selected).filter(id=>selected[id]);
   const skipped = selIds.filter(id=>{ const g=srcGifts.find(x=>x.id===id); return g&&existInTgt.has((g.doctorName||"").toLowerCase()); }).length;
   const willCopy = selIds.length - skipped;
@@ -1017,11 +1028,14 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
   const selGift = (giftItems||[]).find(gi=>gi.id===selGiftId);
 
   const toggleAll = () => {
-    const sel = {};
-    const anyUnchecked = srcGifts.some(g=>!selected[g.id]&&!existInTgt.has((g.doctorName||"").toLowerCase()));
-    if (anyUnchecked) srcGifts.forEach(g=>{ if(!existInTgt.has((g.doctorName||"").toLowerCase())) sel[g.id]=true; });
-    setSelected(sel);
+    const anyUnchecked = visibleGifts.some(g=>!selected[g.id]&&!existInTgt.has((g.doctorName||"").toLowerCase()));
+    if (anyUnchecked) {
+      setSelected(s=>{ const n={...s}; visibleGifts.forEach(g=>{ if(!existInTgt.has((g.doctorName||"").toLowerCase())) n[g.id]=true; }); return n; });
+    } else {
+      setSelected(s=>{ const n={...s}; visibleGifts.forEach(g=>{ delete n[g.id]; }); return n; });
+    }
   };
+  const toggleHQ = hq => setSelHQs(s=>({...s,[hq]:!s[hq]}));
 
   const handleCopy = () => {
     if (!selGift || !willCopy || !tgtMonth || sameMonth) return;
@@ -1111,14 +1125,29 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
           {/* Doctor checklist */}
           {srcGifts.length>0 && (
             <div>
+              {hqsInSrc.length>1 && (
+                <div style={{marginBottom:8}}>
+                  <div className="section-label" style={{marginBottom:4}}>Filter by HQ</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {hqsInSrc.map(hq=>(
+                      <label key={hq} style={{display:"flex",alignItems:"center",gap:4,padding:"3px 10px",borderRadius:20,border:"1px solid",borderColor:selHQs[hq]?"#6366f1":"#e5e7eb",background:selHQs[hq]?"#eef2ff":"white",cursor:"pointer",fontSize:11,fontWeight:700,color:selHQs[hq]?"#4338ca":"#6b7280",userSelect:"none"}}>
+                        <input type="checkbox" checked={!!selHQs[hq]} onChange={()=>toggleHQ(hq)} style={{display:"none"}}/>
+                        {hq}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <input value={docSearch} onChange={e=>setDocSearch(e.target.value)} placeholder="🔍 Search doctor..." className="inp" style={{marginBottom:8,fontSize:12}}/>
               <div className="flex justify-between items-center mb-2">
-                <div className="section-label" style={{marginBottom:0}}>{srcGifts.length} doctors in {srcMonth}</div>
+                <div className="section-label" style={{marginBottom:0}}>{visibleGifts.length}/{srcGifts.length} doctors</div>
                 <button onClick={toggleAll} style={{fontSize:11,fontWeight:800,color:"#2563eb",background:"#eff6ff",border:"1px solid #bfdbfe",borderRadius:6,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit"}}>
                   {allChk?"☑ Deselect All":"☐ Select All"}
                 </button>
               </div>
-              <div style={{maxHeight:260,overflowY:"auto",border:"1px solid #e5e7eb",borderRadius:10}}>
-                {srcGifts.map(g=>{
+              <div style={{maxHeight:220,overflowY:"auto",border:"1px solid #e5e7eb",borderRadius:10}}>
+                {visibleGifts.length===0 && <div className="text-center py-6 text-gray-300 text-sm">No doctors match</div>}
+                {visibleGifts.map(g=>{
                   const exists = existInTgt.has((g.doctorName||"").toLowerCase());
                   return (
                     <label key={g.id} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",borderBottom:"1px solid #f3f4f6",cursor:exists?"default":"pointer",background:exists?"#f9fafb":"white",opacity:exists?0.45:1}}>
