@@ -1021,7 +1021,7 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
     return true;
   });
   const allChk = visibleGifts.length>0 && visibleGifts.every(g=>selected[g.id]||existInTgt.has((g.doctorName||"").toLowerCase()));
-  const selIds = Object.keys(selected).filter(id=>selected[id]);
+  const selIds = visibleGifts.filter(g=>selected[g.id]).map(g=>g.id);
   const skipped = selIds.filter(id=>{ const g=srcGifts.find(x=>x.id===id); return g&&existInTgt.has((g.doctorName||"").toLowerCase()); }).length;
   const willCopy = selIds.length - skipped;
   const sameMonth = tgtMonth && tgtMonth===srcMonth;
@@ -1039,7 +1039,8 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
 
   const handleCopy = () => {
     if (!selGift || !willCopy || !tgtMonth || sameMonth) return;
-    const toCopy = srcGifts.filter(g=>selected[g.id]&&!existInTgt.has((g.doctorName||"").toLowerCase()));
+    const visibleIds = new Set(visibleGifts.map(g=>g.id));
+    const toCopy = srcGifts.filter(g=>visibleIds.has(g.id)&&selected[g.id]&&!existInTgt.has((g.doctorName||"").toLowerCase()));
     const entries = toCopy.map(g=>({...g,
       id: uid(),
       month: tgtMonth,
