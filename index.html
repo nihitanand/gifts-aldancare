@@ -997,6 +997,7 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
   const [selected, setSelected] = useState({});
   const [selGiftId, setSelGiftId] = useState("");
   const [lastCopied, setLastCopied] = useState(null);
+  const [copyPlanSales, setCopyPlanSales] = useState(true);
   const [docSearch, setDocSearch] = useState("");
   const [selHQs, setSelHQs] = useState({});
 
@@ -1040,6 +1041,7 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
   const handleCopy = () => {
     if (!selGift || !willCopy || !tgtMonth || sameMonth) return;
     const toCopy = srcGifts.filter(g=>selected[g.id]&&!existInTgt.has(((g.doctorName||"")+"||"+(g.hqName||"")).toLowerCase()));
+    const blankSales = [{id:uid(),prod:"",qty:"",ptr:"",amt:""}];
     const entries = toCopy.map(g=>({...g,
       id: uid(),
       month: tgtMonth,
@@ -1047,12 +1049,12 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
       giftMrp: selGift.mrp,
       giftPhotoUrl: selGift.photoUrl||"",
       issued: false, issueDate:"", issuedPhotoUrl:"",
-      planSales:[{id:uid(),prod:"",qty:"",ptr:"",amt:""}],
-      crmPlanSales:[{id:uid(),prod:"",qty:"",ptr:"",amt:""}],
-      giftPlanSales:[{id:uid(),prod:"",qty:"",ptr:"",amt:""}],
-      actualSales:[{id:uid(),prod:"",qty:"",ptr:"",amt:""}],
-      crmActualSales:[{id:uid(),prod:"",qty:"",ptr:"",amt:""}],
-      giftActualSales:[{id:uid(),prod:"",qty:"",ptr:"",amt:""}],
+      planSales:     copyPlanSales ? (g.planSales||blankSales)     : blankSales,
+      crmPlanSales:  copyPlanSales ? (g.crmPlanSales||blankSales)  : blankSales,
+      giftPlanSales: copyPlanSales ? (g.giftPlanSales||blankSales) : blankSales,
+      actualSales:    blankSales,
+      crmActualSales: blankSales,
+      giftActualSales:blankSales,
       createdAt:new Date().toISOString()
     }));
     if (onBulkAdd) onBulkAdd(entries);
@@ -1119,6 +1121,14 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
                   ✓ {selGift.name} · ₹{selGift.mrp} selected
                 </div>
               )}
+              {/* Copy plan sales toggle */}
+              <label style={{display:"flex",alignItems:"center",gap:10,marginTop:10,padding:"8px 12px",background:"#f8fafc",borderRadius:8,cursor:"pointer"}}>
+                <input type="checkbox" checked={copyPlanSales} onChange={e=>setCopyPlanSales(e.target.checked)} className="w-4 h-4 accent-indigo-600"/>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#1f2937"}}>Copy Plan Sales from source month</div>
+                  <div style={{fontSize:11,color:"#9ca3af"}}>Carries over product, qty & PTR — you can edit after copying</div>
+                </div>
+              </label>
             </div>
           )}
 
