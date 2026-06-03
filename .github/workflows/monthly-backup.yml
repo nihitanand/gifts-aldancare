@@ -1,0 +1,134 @@
+name: Monthly GiftTrack Backup
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'  # 1st of every month at midnight UTC
+  workflow_dispatch:       # Manual trigger for testing
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read Firebase & Create Slim Backup
+        id: backup
+        run: |
+          python3 << 'PYEOF'
+          import json, urllib.request, os
+          from datetime import datetime
+
+          DB_URL = "https://fintech-nd-default-rtdb.asia-southeast1.firebasedatabase.app"
+          req = urllib.request.Request(f"{DB_URL}/gifttrack/v1.json")
+          with urllib.request.urlopen(req) as r:
+              raw = json.loads(r.read())
+
+          def sum_sales(arr):
+              rows = arr if isinstance(arr,list) else list(arr.values()) if isinstance(arr,dict) else []
+              total = 0
+              for r in rows:
+                  if r:
+                      try: total += float(r.get('amt') or 0)
+                      except: pass
+              return round(total, 2)
+
+          def to_list(v):
+              if isinstance(v, dict): return list(v.values())
+              if isinstance(v, list): return v
+              return []
+
+          gifts = [g for g in to_list(raw.get('gifts')) if g]
+          slim_gifts = []
+          for g in gifts:
+              slim_gifts.append({
+                  'id': g.get('id'), 'month': g.get('month'),
+                  'doctorName': g.get('doctorName'), 'hqName': g.get('hqName'),
+                  'asmName': g.get('asmName'), 'location': g.get('location'),
+                  'speciality': g.get('speciality'), 'giftName': g.get('giftName'),
+                  'giftMrp': g.get('giftMrp'), 'crmType': g.get('crmType'),
+                  'issued': g.get('issued'), 'issueDate': g.get('issueDate'),
+                  'planSalesTotal': sum_sales(g.get('planSales',[])),
+                  'giftPlanSalesTotal': sum_sales(g.get('giftPlanSales',[])),
+                  'actualSalesTotal': sum_sales(g.get('actualSales',[])),
+                  'giftActualSalesTotal': sum_sales(g.get('giftActualSales',[])),
+              })
+
+          backup = {
+              'generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
+              'summary': {
+                  'gifts': len(slim_gifts),
+                  'issued': sum(1 for g in slim_gifts if g.get('issued')),
+                  'pending': sum(1 for g in slim_gifts if not g.get('issued')),
+                  'months': sorted(set(g.get('month','') for g in slim_gifts if g.get('month')))
+              },
+              'gifts': slim_gifts,
+              'doctors': to_list(raw.get('doctors')),
+              'giftItems': to_list(raw.get('giftItems')),
+              'products': to_list(raw.get('products')),
+          }
+
+          filename = f"GiftTrack_Backup_{datetime.now().strftime('%Y-%m-%d')}.json"
+          with open(filename, 'w') as f:
+              json.dump(backup, f, indent=2)
+
+          size_kb = os.path.getsize(filename) // 1024
+          issued = backup['summary']['issued']
+          pending = backup['summary']['pending']
+          months = ', '.join(backup['summary']['months'])
+
+          print(f"FILENAME={filename}")
+          print(f"SIZE_KB={size_kb}")
+          print(f"ISSUED={issued}")
+          print(f"PENDING={pending}")
+          print(f"MONTHS={months}")
+          print(f"GIFTS={len(slim_gifts)}")
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f"filename={filename}\n")
+              f.write(f"size_kb={size_kb}\n")
+              f.write(f"issued={issued}\n")
+              f.write(f"pending={pending}\n")
+              f.write(f"months={months}\n")
+              f.write(f"gifts={len(slim_gifts)}\n")
+          PYEOF
+
+      - name: Upload to Hostinger via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: 77.37.37.73
+          username: u344800990
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: /domains/aldancare.com/public_html/gifts/backups/
+          include: "GiftTrack_Backup_*.json"
+
+      - name: Send Email Notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          to: hr@aldancare.com
+          from: GiftTrack Backup <${{ secrets.MAIL_USERNAME }}>
+          subject: "✅ GiftTrack Monthly Backup — ${{ steps.backup.outputs.filename }}"
+          body: |
+            Hi,
+
+            GiftTrack monthly backup has been completed successfully.
+
+            📁 Backup Details:
+            • File: ${{ steps.backup.outputs.filename }}
+            • Folder: gifts.aldancare.com/backups/
+            • Full path: https://gifts.aldancare.com/backups/${{ steps.backup.outputs.filename }}
+            • Size: ${{ steps.backup.outputs.size_kb }} KB
+
+            📊 Data Summary:
+            • Total Gifts: ${{ steps.backup.outputs.gifts }}
+            • Issued: ${{ steps.backup.outputs.issued }}
+            • Pending: ${{ steps.backup.outputs.pending }}
+            • Months covered: ${{ steps.backup.outputs.months }}
+
+            You can download the backup directly from:
+            https://gifts.aldancare.com/backups/${{ steps.backup.outputs.filename }}
+
+            Regards,
+            GiftTrack — Aldan Healthcare
