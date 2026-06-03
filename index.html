@@ -2677,6 +2677,7 @@ function App() {
             }}>
               {syncSt==="synced" ? "● Live" : syncSt==="saving" ? "⟳ Saving" : "✕ Error"}
             </span>
+            <button onClick={()=>setBackupsOpen(true)} title="Admin Backups" style={{background:"none",border:"1px solid #e2e8f0",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:14,fontFamily:"inherit",flexShrink:0}}>🔐</button>
           </div>
         </div>
       </nav>
