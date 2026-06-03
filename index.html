@@ -2364,81 +2364,6 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
 /* ══════════════════════════════════
    MAIN APP
 ══════════════════════════════════ */
-/* ══════════════════════════════════
-   BACKUPS PANEL
-══════════════════════════════════ */
-function BackupsPanel({ onClose }) {
-  const [backups, setBackups] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => { loadBackups(); }, []);
-
-  const loadBackups = () => {
-    setLoading(true);
-    DB.ref("gifttrack/backups").once("value").then(snap=>{
-      const raw = snap.val()||{};
-      const list = Object.entries(raw).map(([k,v])=>{
-        const dt = new Date(k.replace(/(-)(\d{2})(-)(\d{2})$/,'$2:$4').replace(/-/g,v=>v==='-'?'-':'-'));
-        return { key:k, ts:v.ts||k, count:v.count||0, gifts:v.gifts };
-      }).sort((a,b)=>b.key.localeCompare(a.key));
-      setBackups(list);
-      setLoading(false);
-    });
-  };
-
-  const download = (b) => {
-    const blob = new Blob([JSON.stringify(b.gifts, null, 2)], {type:"application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `GiftTrack_Backup_${b.key}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const fmtTs = (ts) => {
-    try {
-      const d = new Date(ts.replace(/-(\d{2})-(\d{2})$/, ':$1:$2'));
-      return d.toLocaleString("en-IN", {day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
-    } catch { return ts; }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto" style={{background:"rgba(15,23,42,0.75)"}}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-6">
-        <div className="flex justify-between items-center px-6 pt-5 pb-4 border-b border-gray-100">
-          <h2 className="text-base font-bold text-gray-800">🔐 Gift Data Backups</h2>
-          <button onClick={onClose} className="text-gray-300 hover:text-gray-700 text-xl font-bold">✕</button>
-        </div>
-        <div className="px-6 py-5">
-          {loading && <div className="text-center py-8 text-gray-400">Loading backups…</div>}
-          {!loading && backups.length===0 && <div className="text-center py-8 text-gray-300 text-sm">No backups yet — they are created automatically before each save</div>}
-          {!loading && backups.length>0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-gray-400 mb-3">Showing last {backups.length} backup(s). Auto-saved before every gift write.</p>
-              {backups.map(b=>(
-                <div key={b.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                  <div>
-                    <div className="font-bold text-sm text-gray-800">{fmtTs(b.ts)}</div>
-                    <div className="text-xs text-gray-400">{b.count} gift entries</div>
-                  </div>
-                  <button onClick={()=>download(b)}
-                    style={{background:"#1e3a5f",color:"white",border:"none",borderRadius:8,padding:"6px 14px",fontSize:12,fontWeight:800,cursor:"pointer",fontFamily:"inherit"}}>
-                    ⬇ Download
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="px-6 pb-5">
-          <button onClick={onClose} className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-bold hover:bg-gray-200">Close</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 
 function App() {
   const [data, setData] = useState(null);
@@ -2449,7 +2374,6 @@ function App() {
   const [toast, setToast] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [sharing, setSharing] = useState(false);
-  const [backupsOpen, setBackupsOpen] = useState(false);
 
   const notify = (msg, color="green") => {
     setToast({ msg, color });
@@ -2513,52 +2437,32 @@ function App() {
   // Gifts
   // Gifts — all ops use index-targeted writes, no push(), no full array overwrite
   const giftsRef = () => DB.ref(PATH + "/gifts");
-  const BACKUP_PATH = "gifttrack/backups";
-  const takeBackup = () => {
-    const ts = new Date().toISOString().replace(/[:.T]/g,"-").slice(0,19);
-    giftsRef().once("value").then(snap=>{
-      const arr = toArr(snap.val()).filter(Boolean);
-      if(!arr.length) return;
-      DB.ref(BACKUP_PATH+"/"+ts).set({ts, count:arr.length, gifts:arr}).then(()=>{
-        // Prune to last 10
-        DB.ref(BACKUP_PATH).once("value").then(s=>{
-          const keys = Object.keys(s.val()||{}).filter(k=>k!=="test").sort();
-          if(keys.length > 10) keys.slice(0,keys.length-10).forEach(k=>DB.ref(BACKUP_PATH+"/"+k).remove());
-        });
-      });
-    }).catch(e=>console.error("Backup failed:",e));
-  };
+
   const saveGift = g => {
-    takeBackup();
+    // Use dataRef for always-current index lookup — no Firebase read needed
+    const cur = toArr((dataRef.current||data||{}).gifts).filter(Boolean);
+    const idx = cur.findIndex(x=>x&&x.id===g.id);
     setSyncSt("saving");
-    giftsRef().once("value").then(snap=>{
-      const raw = snap.val();
-      const arr = Array.isArray(raw) ? raw : Object.values(raw||{});
-      const idx = arr.findIndex(x=>x&&x.id===g.id);
-      if (idx !== -1) {
-        // Update at exact index
-        return DB.ref(PATH+"/gifts/"+idx).set(g);
-      } else {
-        // Append at next index
-        return DB.ref(PATH+"/gifts/"+arr.filter(Boolean).length).set(g);
-      }
-    }).then(()=>{ setSyncSt("synced"); notify("Gift entry saved!"); })
-    .catch(e=>{ console.error(e); setSyncSt("error"); });
+    if (idx !== -1) {
+      DB.ref(PATH+"/gifts/"+idx).set(g)
+        .then(()=>{ setSyncSt("synced"); notify("Gift entry updated!"); })
+        .catch(e=>{ console.error(e); setSyncSt("error"); });
+    } else {
+      DB.ref(PATH+"/gifts/"+cur.length).set(g)
+        .then(()=>{ setSyncSt("synced"); notify("Gift entry saved!"); })
+        .catch(e=>{ console.error(e); setSyncSt("error"); });
+    }
   };
   const bulkAddGifts = (entries) => {
-    takeBackup();
+    const cur = toArr((dataRef.current||data||{}).gifts).filter(Boolean);
+    const updates = {};
+    entries.forEach((e,i)=>{ updates[cur.length+i]=e; });
     setSyncSt("saving");
-    giftsRef().once("value").then(snap=>{
-      const raw = snap.val();
-      const len = Array.isArray(raw) ? raw.filter(Boolean).length : Object.values(raw||{}).filter(Boolean).length;
-      const updates = {};
-      entries.forEach((e,i)=>{ updates[len+i]=e; });
-      return DB.ref(PATH+"/gifts").update(updates);
-    }).then(()=>setSyncSt("synced"))
-    .catch(e=>{ console.error(e); setSyncSt("error"); });
+    DB.ref(PATH+"/gifts").update(updates)
+      .then(()=>setSyncSt("synced"))
+      .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
   const bulkEditGifts = (updatedGifts, count, giftName) => {
-    takeBackup();
     setSyncSt("saving");
     giftsRef().once("value").then(snap=>{
       const raw = snap.val();
@@ -2571,7 +2475,6 @@ function App() {
     .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
   const deleteGift = id => {
-    takeBackup();
     setSyncSt("saving");
     giftsRef().once("value").then(snap=>{
       const arr = toArr(snap.val()).filter(Boolean);
@@ -2606,7 +2509,6 @@ function App() {
   return (
     <div style={{ minHeight: "100vh", background: "#f0f4f8" }}>
       <Toast {...(toast || {})} />
-      {backupsOpen && <BackupsPanel onClose={()=>setBackupsOpen(false)}/>}
       <Confirm open={!!confirm} msg={confirm?.msg} onOk={confirm?.onOk} onCancel={() => setConfirm(null)} />
 
       {/* ── TOP NAV — Groww-style white bar ── */}
@@ -2655,7 +2557,6 @@ function App() {
             }}>
               {syncSt==="synced" ? "● Live" : syncSt==="saving" ? "⟳ Saving" : "✕ Error"}
             </span>
-            <button onClick={()=>setBackupsOpen(true)} title="Admin Backups" style={{background:"none",border:"1px solid #e2e8f0",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:14,fontFamily:"inherit",flexShrink:0}}>🔐</button>
             <button onClick={()=>window.location.reload(true)} title="Hard Refresh" style={{background:"none",border:"1px solid #e2e8f0",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:14,fontFamily:"inherit",flexShrink:0}}>🔄</button>
           </div>
         </div>
