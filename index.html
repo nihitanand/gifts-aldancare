@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎁 GiftTrack v1.9 – Aldan Healthcare</title>
+  <title>🎁 GiftTrack v2.0 – Aldan Healthcare</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -2158,7 +2158,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
 
   // Level label + subtitle right side
   tf(ctx,levelLabel,W-16,34,16,"900","#1e3a5f","right",580);
-  tf(ctx,(subtitle||dateStr)+" · GiftTrack v1.9",W-16,56,10,"600","#94a3b8","right");
+  tf(ctx,(subtitle||dateStr)+" · GiftTrack v2.0",W-16,56,10,"600","#94a3b8","right");
   y=80;
 
   // ── KPI STRIP ──
@@ -2340,7 +2340,7 @@ async function generateShareCard(gifts, title, subtitle, extraContext, treeData)
     y+=32;
   }
   rect(ctx,0,y,W,38,"#f8fafc"); hline(ctx,y,"#e2e8f0",1);
-  tf(ctx,"GiftTrack v1.9  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
+  tf(ctx,"GiftTrack v2.0  ·  gifts.aldancare.com  ·  "+dateStr,W/2,y+24,9,"600","#94a3b8","center");
   y+=38;
 
   // ── Crop and export ──
@@ -2647,7 +2647,7 @@ function App() {
             <div style={{ width: 1, height: 28, background: "#e2e8f0" }} className="desktop-nav"></div>
             <div>
               <div style={{ fontWeight: 900, fontSize: 15, color: "#1e3a5f", lineHeight: 1.1 }}>GiftTrack</div>
-              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v1.9 · Apr 2026</div>
+              <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 2, fontWeight: 700 }}>v2.0 · Apr 2026</div>
             </div>
           </div>
           {/* Desktop nav tabs */}
