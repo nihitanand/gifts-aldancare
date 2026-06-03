@@ -2511,72 +2511,48 @@ function App() {
   const deleteGiftItem = id => { save({ ...data, giftItems: (data.giftItems||[]).filter(x => x.id!==id) }); notify("Deleted","red"); };
 
   // Gifts
-  // Gifts — push() for adds, key-targeted set() for edits (no race condition)
+  // Gifts — all ops use index-targeted writes, no push(), no full array overwrite
   const giftsRef = () => DB.ref(PATH + "/gifts");
-  const BACKUP_PATH = "gifttrack/backups";
-  const MAX_BACKUPS = 10;
-  const takeBackup = () => {
-    const ts = new Date().toISOString().replace(/[:.T]/g,"-").slice(0,19);
-    giftsRef().once("value").then(snap=>{
-      const arr = toArr(snap.val()).filter(Boolean);
-      if(!arr.length) return;
-      return DB.ref(BACKUP_PATH+"/"+ts).set({ts, count:arr.length, gifts:arr}).then(()=>{
-        // Prune to MAX_BACKUPS
-        DB.ref(BACKUP_PATH).once("value").then(s=>{
-          const keys = Object.keys(s.val()||{}).sort();
-          if(keys.length > MAX_BACKUPS) {
-            keys.slice(0, keys.length-MAX_BACKUPS).forEach(k=>DB.ref(BACKUP_PATH+"/"+k).remove());
-          }
-        });
-      });
-    }).catch(e=>console.error("Backup failed:", e));
-  };
   const saveGift = g => {
-    takeBackup();
-    const exists = (data.gifts||[]).find(x=>x.id===g.id);
-    if (!exists) {
-      setSyncSt("saving");
-      giftsRef().push(g)
-        .then(()=>{ setSyncSt("synced"); notify("Gift entry saved!"); })
-        .catch(e=>{ console.error(e); setSyncSt("error"); });
-    } else {
-      // Find the Firebase key for this entry and update only that node
-      setSyncSt("saving");
-      giftsRef().once("value").then(snap=>{
-        const raw = snap.val();
-        // raw is {key: entry} — find the key matching g.id
-        const entries = typeof raw === "object" && !Array.isArray(raw) ? raw : 
-                        Array.isArray(raw) ? Object.fromEntries(raw.map((v,i)=>[i,v])) : {};
-        const fbKey = Object.keys(entries).find(k => entries[k] && entries[k].id === g.id);
-        if (fbKey !== undefined) {
-          return DB.ref(PATH + "/gifts/" + fbKey).set(g);
-        } else {
-          // fallback: push as new
-          return giftsRef().push(g);
-        }
-      }).then(()=>{ setSyncSt("synced"); notify("Gift entry updated!"); })
-      .catch(e=>{ console.error(e); setSyncSt("error"); });
-    }
+    setSyncSt("saving");
+    giftsRef().once("value").then(snap=>{
+      const raw = snap.val();
+      const arr = Array.isArray(raw) ? raw : Object.values(raw||{});
+      const idx = arr.findIndex(x=>x&&x.id===g.id);
+      if (idx !== -1) {
+        // Update at exact index
+        return DB.ref(PATH+"/gifts/"+idx).set(g);
+      } else {
+        // Append at next index
+        return DB.ref(PATH+"/gifts/"+arr.filter(Boolean).length).set(g);
+      }
+    }).then(()=>{ setSyncSt("synced"); notify("Gift entry saved!"); })
+    .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
   const bulkAddGifts = (entries) => {
-    takeBackup();
-    setSyncSt("saving");
-    Promise.all(entries.map(e=>giftsRef().push(e)))
-      .then(()=>setSyncSt("synced"))
-      .catch(e=>{ console.error(e); setSyncSt("error"); });
-  };
-  const bulkEditGifts = (updatedGifts, count, giftName) => {
-    takeBackup();
     setSyncSt("saving");
     giftsRef().once("value").then(snap=>{
-      const arr = toArr(snap.val()).filter(Boolean);
+      const raw = snap.val();
+      const len = Array.isArray(raw) ? raw.filter(Boolean).length : Object.values(raw||{}).filter(Boolean).length;
+      const updates = {};
+      entries.forEach((e,i)=>{ updates[len+i]=e; });
+      return DB.ref(PATH+"/gifts").update(updates);
+    }).then(()=>setSyncSt("synced"))
+    .catch(e=>{ console.error(e); setSyncSt("error"); });
+  };
+  const bulkEditGifts = (updatedGifts, count, giftName) => {
+    setSyncSt("saving");
+    giftsRef().once("value").then(snap=>{
+      const raw = snap.val();
+      const arr = Array.isArray(raw) ? raw : Object.values(raw||{});
       const idMap = new Map(updatedGifts.map(u=>[u.id,u]));
-      return giftsRef().set(arr.map(x=>idMap.has(x.id)?idMap.get(x.id):x));
+      const updates = {};
+      arr.forEach((g,i)=>{ if(g&&idMap.has(g.id)) updates[i]=idMap.get(g.id); });
+      return DB.ref(PATH+"/gifts").update(updates);
     }).then(()=>{ setSyncSt("synced"); notify("✅ "+count+" entries updated to "+giftName); })
     .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
   const deleteGift = id => {
-    takeBackup();
     setSyncSt("saving");
     giftsRef().once("value").then(snap=>{
       const arr = toArr(snap.val()).filter(Boolean);
