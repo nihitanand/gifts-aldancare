@@ -2629,6 +2629,7 @@ function App() {
   return (
     <div style={{ minHeight: "100vh", background: "#f0f4f8" }}>
       <Toast {...(toast || {})} />
+      {backupsOpen && <BackupsPanel onClose={()=>setBackupsOpen(false)}/>}
       <Confirm open={!!confirm} msg={confirm?.msg} onOk={confirm?.onOk} onCancel={() => setConfirm(null)} />
 
       {/* ── TOP NAV — Groww-style white bar ── */}
