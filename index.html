@@ -2513,7 +2513,23 @@ function App() {
   // Gifts
   // Gifts — all ops use index-targeted writes, no push(), no full array overwrite
   const giftsRef = () => DB.ref(PATH + "/gifts");
+  const BACKUP_PATH = "gifttrack/backups";
+  const takeBackup = () => {
+    const ts = new Date().toISOString().replace(/[:.T]/g,"-").slice(0,19);
+    giftsRef().once("value").then(snap=>{
+      const arr = toArr(snap.val()).filter(Boolean);
+      if(!arr.length) return;
+      DB.ref(BACKUP_PATH+"/"+ts).set({ts, count:arr.length, gifts:arr}).then(()=>{
+        // Prune to last 10
+        DB.ref(BACKUP_PATH).once("value").then(s=>{
+          const keys = Object.keys(s.val()||{}).filter(k=>k!=="test").sort();
+          if(keys.length > 10) keys.slice(0,keys.length-10).forEach(k=>DB.ref(BACKUP_PATH+"/"+k).remove());
+        });
+      });
+    }).catch(e=>console.error("Backup failed:",e));
+  };
   const saveGift = g => {
+    takeBackup();
     setSyncSt("saving");
     giftsRef().once("value").then(snap=>{
       const raw = snap.val();
@@ -2530,6 +2546,7 @@ function App() {
     .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
   const bulkAddGifts = (entries) => {
+    takeBackup();
     setSyncSt("saving");
     giftsRef().once("value").then(snap=>{
       const raw = snap.val();
@@ -2541,6 +2558,7 @@ function App() {
     .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
   const bulkEditGifts = (updatedGifts, count, giftName) => {
+    takeBackup();
     setSyncSt("saving");
     giftsRef().once("value").then(snap=>{
       const raw = snap.val();
@@ -2553,6 +2571,7 @@ function App() {
     .catch(e=>{ console.error(e); setSyncSt("error"); });
   };
   const deleteGift = id => {
+    takeBackup();
     setSyncSt("saving");
     giftsRef().once("value").then(snap=>{
       const arr = toArr(snap.val()).filter(Boolean);
