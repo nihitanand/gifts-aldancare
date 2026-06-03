@@ -2434,7 +2434,7 @@ function App() {
   const deleteGiftItem = id => { save({ ...data, giftItems: (data.giftItems||[]).filter(x => x.id!==id) }); notify("Deleted","red"); };
 
   // Gifts
-  // Gifts — push() for new adds (atomic append), fresh-read+set for edits/deletes
+  // Gifts — push() for adds, key-targeted set() for edits (no race condition)
   const giftsRef = () => DB.ref(PATH + "/gifts");
   const saveGift = g => {
     const exists = (data.gifts||[]).find(x=>x.id===g.id);
@@ -2444,10 +2444,20 @@ function App() {
         .then(()=>{ setSyncSt("synced"); notify("Gift entry saved!"); })
         .catch(e=>{ console.error(e); setSyncSt("error"); });
     } else {
+      // Find the Firebase key for this entry and update only that node
       setSyncSt("saving");
       giftsRef().once("value").then(snap=>{
-        const arr = toArr(snap.val()).filter(Boolean);
-        return giftsRef().set(arr.map(x=>x.id===g.id?g:x));
+        const raw = snap.val();
+        // raw is {key: entry} — find the key matching g.id
+        const entries = typeof raw === "object" && !Array.isArray(raw) ? raw : 
+                        Array.isArray(raw) ? Object.fromEntries(raw.map((v,i)=>[i,v])) : {};
+        const fbKey = Object.keys(entries).find(k => entries[k] && entries[k].id === g.id);
+        if (fbKey !== undefined) {
+          return DB.ref(PATH + "/gifts/" + fbKey).set(g);
+        } else {
+          // fallback: push as new
+          return giftsRef().push(g);
+        }
       }).then(()=>{ setSyncSt("synced"); notify("Gift entry updated!"); })
       .catch(e=>{ console.error(e); setSyncSt("error"); });
     }
