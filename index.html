@@ -2374,6 +2374,9 @@ function BackupsPanel({ onClose }) {
   const [loading, setLoading] = useState(false);
   const [pinErr, setPinErr] = useState(false);
 
+  // Reset auth state every time panel opens
+  useEffect(() => { setAuthed(false); setPin(""); setBackups([]); }, []);
+
   const checkPin = () => {
     if (pin === "aldan2026") { setAuthed(true); loadBackups(); }
     else { setPinErr(true); setTimeout(()=>setPinErr(false),2000); }
@@ -2534,7 +2537,7 @@ function App() {
   const BACKUP_PATH = "gifttrack/backups";
   const MAX_BACKUPS = 10;
   const takeBackup = () => {
-    const ts = new Date().toISOString().replace(/[:.]/g,"-").slice(0,19);
+    const ts = new Date().toISOString().replace(/[:.T]/g,"-").slice(0,19);
     giftsRef().once("value").then(snap=>{
       const arr = toArr(snap.val()).filter(Boolean);
       if(!arr.length) return;
