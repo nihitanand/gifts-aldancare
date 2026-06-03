@@ -2678,6 +2678,7 @@ function App() {
               {syncSt==="synced" ? "● Live" : syncSt==="saving" ? "⟳ Saving" : "✕ Error"}
             </span>
             <button onClick={()=>setBackupsOpen(true)} title="Admin Backups" style={{background:"none",border:"1px solid #e2e8f0",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:14,fontFamily:"inherit",flexShrink:0}}>🔐</button>
+            <button onClick={()=>{ setSyncSt("connecting"); DB.ref(PATH).once("value").then(snap=>{ const raw=snap.val(); if(raw){ const freshData={products:toArr(raw.products).filter(Boolean),doctors:toArr(raw.doctors).filter(Boolean),gifts:toArr(raw.gifts).filter(Boolean),giftItems:toArr(raw.giftItems).filter(Boolean)}; dataRef.current=freshData; setData(freshData); } setSyncSt("synced"); notify("Data refreshed!"); }).catch(e=>{ console.error(e); setSyncSt("error"); }); }} title="Refresh data from Firebase" style={{background:"none",border:"1px solid #e2e8f0",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:14,fontFamily:"inherit",flexShrink:0}}>🔄</button>
           </div>
         </div>
       </nav>
