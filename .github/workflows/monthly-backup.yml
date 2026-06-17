@@ -9,7 +9,7 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Read Firebase & Create Slim Backup
+      - name: Create Backup & Save to Firebase + Send Email
         id: backup
         run: |
           python3 << 'PYEOF'
@@ -17,6 +17,8 @@ jobs:
           from datetime import datetime
 
           DB_URL = "https://fintech-nd-default-rtdb.asia-southeast1.firebasedatabase.app"
+
+          # Read full data
           req = urllib.request.Request(f"{DB_URL}/gifttrack/v1.json")
           with urllib.request.urlopen(req) as r:
               raw = json.loads(r.read())
@@ -51,8 +53,13 @@ jobs:
                   'giftActualSalesTotal': sum_sales(g.get('giftActualSales',[])),
               })
 
+          now = datetime.now()
+          filename = f"GiftTrack_Backup_{now.strftime('%Y-%m-%d')}.json"
+          backup_key = now.strftime('%Y-%m')
+
           backup = {
-              'generated': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
+              'generated': now.strftime('%Y-%m-%d %H:%M:%S UTC'),
+              'filename': filename,
               'summary': {
                   'gifts': len(slim_gifts),
                   'issued': sum(1 for g in slim_gifts if g.get('issued')),
@@ -65,12 +72,21 @@ jobs:
               'products': to_list(raw.get('products')),
           }
 
-          filename = f"GiftTrack_Backup_{datetime.now().strftime('%Y-%m-%d')}.json"
-          with open(filename, 'w') as f:
-              json.dump(backup, f, indent=2)
+          # Save to Firebase backups path
+          payload = json.dumps(backup).encode()
+          req2 = urllib.request.Request(
+              f"{DB_URL}/gifttrack/backups_monthly/{backup_key}.json",
+              data=payload, method='PUT',
+              headers={'Content-Type': 'application/json'}
+          )
+          with urllib.request.urlopen(req2) as r:
+              r.read()
 
-          size_kb = os.path.getsize(filename) // 1024
+          size_kb = len(payload) // 1024
           months = ', '.join(backup['summary']['months'])
+
+          print(f"✅ Backup saved to Firebase: gifttrack/backups_monthly/{backup_key}")
+          print(f"   Size: {size_kb} KB | Gifts: {len(slim_gifts)} | Issued: {backup['summary']['issued']}")
 
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"filename={filename}\n")
@@ -79,21 +95,8 @@ jobs:
               f.write(f"pending={backup['summary']['pending']}\n")
               f.write(f"months={months}\n")
               f.write(f"gifts={len(slim_gifts)}\n")
-
-          print(f"Backup created: {filename} ({size_kb} KB)")
+              f.write(f"backup_key={backup_key}\n")
           PYEOF
-
-      - name: Upload to Hostinger via curl FTP
-        run: |
-          FILENAME=$(ls GiftTrack_Backup_*.json)
-          echo "Uploading $FILENAME..."
-          curl --ftp-pasv \
-            --user "u344800990:${{ secrets.FTP_PASSWORD }}" \
-            --upload-file "$FILENAME" \
-            "ftp://77.37.37.73/domains/aldancare.com/public_html/gifts/backups/$FILENAME" \
-            --create-dirs \
-            --retry 3 --retry-delay 5
-          echo "Upload done"
 
       - name: Send Email Notification
         uses: dawidd6/action-send-mail@v3
@@ -111,16 +114,17 @@ jobs:
             GiftTrack monthly backup completed successfully.
 
             📁 Backup Details:
-            • File   : ${{ steps.backup.outputs.filename }}
-            • Folder : gifts.aldancare.com/backups/
-            • URL    : https://gifts.aldancare.com/backups/${{ steps.backup.outputs.filename }}
-            • Size   : ${{ steps.backup.outputs.size_kb }} KB
+            • File        : ${{ steps.backup.outputs.filename }}
+            • Stored in   : Firebase → gifttrack/backups_monthly/${{ steps.backup.outputs.backup_key }}
+            • Size        : ${{ steps.backup.outputs.size_kb }} KB
 
             📊 Data Summary:
             • Total Gifts : ${{ steps.backup.outputs.gifts }}
             • Issued      : ${{ steps.backup.outputs.issued }}
             • Pending     : ${{ steps.backup.outputs.pending }}
             • Months      : ${{ steps.backup.outputs.months }}
+
+            To download: Share this email with Claude and ask to fetch and download the backup from Firebase path gifttrack/backups_monthly/${{ steps.backup.outputs.backup_key }}
 
             Regards,
             GiftTrack — Aldan Healthcare
