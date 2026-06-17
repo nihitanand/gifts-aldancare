@@ -2,8 +2,8 @@ name: Monthly GiftTrack Backup
 
 on:
   schedule:
-    - cron: '0 0 1 * *'  # 1st of every month at midnight UTC
-  workflow_dispatch:       # Manual trigger for testing
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
 
 jobs:
   backup:
@@ -31,11 +31,11 @@ jobs:
               return round(total, 2)
 
           def to_list(v):
-              if isinstance(v, dict): return list(v.values())
-              if isinstance(v, list): return v
+              if isinstance(v, dict): return [x for x in v.values() if x]
+              if isinstance(v, list): return [x for x in v if x]
               return []
 
-          gifts = [g for g in to_list(raw.get('gifts')) if g]
+          gifts = to_list(raw.get('gifts'))
           slim_gifts = []
           for g in gifts:
               slim_gifts.append({
@@ -70,35 +70,30 @@ jobs:
               json.dump(backup, f, indent=2)
 
           size_kb = os.path.getsize(filename) // 1024
-          issued = backup['summary']['issued']
-          pending = backup['summary']['pending']
           months = ', '.join(backup['summary']['months'])
-
-          print(f"FILENAME={filename}")
-          print(f"SIZE_KB={size_kb}")
-          print(f"ISSUED={issued}")
-          print(f"PENDING={pending}")
-          print(f"MONTHS={months}")
-          print(f"GIFTS={len(slim_gifts)}")
 
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f"filename={filename}\n")
               f.write(f"size_kb={size_kb}\n")
-              f.write(f"issued={issued}\n")
-              f.write(f"pending={pending}\n")
+              f.write(f"issued={backup['summary']['issued']}\n")
+              f.write(f"pending={backup['summary']['pending']}\n")
               f.write(f"months={months}\n")
               f.write(f"gifts={len(slim_gifts)}\n")
+
+          print(f"Backup created: {filename} ({size_kb} KB)")
           PYEOF
 
-      - name: Upload to Hostinger via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: 77.37.37.73
-          username: u344800990
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./
-          server-dir: /domains/aldancare.com/public_html/gifts/backups/
-          include: "GiftTrack_Backup_*.json"
+      - name: Upload to Hostinger via curl FTP
+        run: |
+          FILENAME=$(ls GiftTrack_Backup_*.json)
+          echo "Uploading $FILENAME..."
+          curl --ftp-pasv \
+            --user "u344800990:${{ secrets.FTP_PASSWORD }}" \
+            --upload-file "$FILENAME" \
+            "ftp://77.37.37.73/domains/aldancare.com/public_html/gifts/backups/$FILENAME" \
+            --create-dirs \
+            --retry 3 --retry-delay 5
+          echo "Upload done"
 
       - name: Send Email Notification
         uses: dawidd6/action-send-mail@v3
@@ -113,22 +108,19 @@ jobs:
           body: |
             Hi,
 
-            GiftTrack monthly backup has been completed successfully.
+            GiftTrack monthly backup completed successfully.
 
             📁 Backup Details:
-            • File: ${{ steps.backup.outputs.filename }}
-            • Folder: gifts.aldancare.com/backups/
-            • Full path: https://gifts.aldancare.com/backups/${{ steps.backup.outputs.filename }}
-            • Size: ${{ steps.backup.outputs.size_kb }} KB
+            • File   : ${{ steps.backup.outputs.filename }}
+            • Folder : gifts.aldancare.com/backups/
+            • URL    : https://gifts.aldancare.com/backups/${{ steps.backup.outputs.filename }}
+            • Size   : ${{ steps.backup.outputs.size_kb }} KB
 
             📊 Data Summary:
-            • Total Gifts: ${{ steps.backup.outputs.gifts }}
-            • Issued: ${{ steps.backup.outputs.issued }}
-            • Pending: ${{ steps.backup.outputs.pending }}
-            • Months covered: ${{ steps.backup.outputs.months }}
-
-            You can download the backup directly from:
-            https://gifts.aldancare.com/backups/${{ steps.backup.outputs.filename }}
+            • Total Gifts : ${{ steps.backup.outputs.gifts }}
+            • Issued      : ${{ steps.backup.outputs.issued }}
+            • Pending     : ${{ steps.backup.outputs.pending }}
+            • Months      : ${{ steps.backup.outputs.months }}
 
             Regards,
             GiftTrack — Aldan Healthcare
