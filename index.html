@@ -2481,30 +2481,19 @@ function App() {
   const giftsRef = () => DB.ref(PATH + "/gifts");
 
   const saveGift = g => {
+    // Keyed storage — write directly to this entry's own node, never touches other entries
+    const wasNew = !(data.gifts||[]).some(x=>x.id===g.id);
     setSyncSt("saving");
-    // Transaction guarantees correct index/append regardless of local state staleness
-    let wasNew = false;
-    DB.ref(PATH+"/gifts").transaction(current => {
-      const arr = toArr(current).filter(Boolean);
-      const idx = arr.findIndex(x=>x&&x.id===g.id);
-      if (idx !== -1) {
-        arr[idx] = g;
-        wasNew = false;
-      } else {
-        arr.push(g);
-        wasNew = true;
-      }
-      return arr;
-    }, (err, committed) => {
-      if (err || !committed) { console.error("saveGift tx failed:", err); setSyncSt("error"); }
-      else { setSyncSt("synced"); notify(wasNew ? "Gift entry saved!" : "Gift entry updated!"); }
-    });
+    DB.ref(PATH+"/gifts/"+g.id).set(g)
+      .then(()=>{ setSyncSt("synced"); notify(wasNew ? "Gift entry saved!" : "Gift entry updated!"); })
+      .catch(e=>{ console.error("saveGift failed:", e); setSyncSt("error"); });
   };
   const bulkAddGifts = (entries) => {
     setSyncSt("saving");
-    // Each entry pushed independently — genuinely atomic, no payload size limit,
-    // no conflict possible since each push() gets a guaranteed-unique server key
-    Promise.all(entries.map(e => giftsRef().push(e)))
+    // Multi-path update — each entry written to its own key in ONE request, never touches others
+    const updates = {};
+    entries.forEach(e=>{ updates[e.id] = e; });
+    DB.ref(PATH+"/gifts").update(updates)
       .then(() => setSyncSt("synced"))
       .catch(e => { console.error("bulkAddGifts failed:", e); setSyncSt("error"); });
   };
@@ -2524,13 +2513,9 @@ function App() {
   };
   const deleteGift = id => {
     setSyncSt("saving");
-    giftsRef().transaction(current => {
-      const arr = toArr(current).filter(Boolean);
-      return arr.filter(x=>x.id!==id);
-    }, (err, committed) => {
-      if (err || !committed) { console.error("deleteGift tx failed:", err); setSyncSt("error"); }
-      else { setSyncSt("synced"); notify("Deleted","red"); }
-    });
+    DB.ref(PATH+"/gifts/"+id).remove()
+      .then(()=>{ setSyncSt("synced"); notify("Deleted","red"); })
+      .catch(e=>{ console.error("deleteGift failed:", e); setSyncSt("error"); });
   };
 
   const handleShare = async (type, gifts, label, level, treeData) => {
