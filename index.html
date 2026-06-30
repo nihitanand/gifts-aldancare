@@ -2388,12 +2388,14 @@ function App() {
       if (raw === null) {
         ref.set(SEED_STATE).catch(console.error);
       } else {
-        setData({
+        const freshData = {
           products:  toArr(raw.products).filter(Boolean),
           doctors:   toArr(raw.doctors).filter(Boolean),
           gifts:     toArr(raw.gifts).filter(Boolean),
           giftItems: toArr(raw.giftItems).filter(Boolean),
-        });
+        };
+        dataRef.current = freshData;
+        setData(freshData);
         setLoaded(true);
         setSyncSt("synced");
       }
@@ -2420,67 +2422,115 @@ function App() {
 
   /* ── CRUD ── */
   // Products
-  const addProduct    = p => save({ ...data, products: [...data.products, p] });
-  const editProduct   = p => save({ ...data, products: data.products.map(x => x.id===p.id ? p : x) });
-  const deleteProduct = id => save({ ...data, products: data.products.filter(x => x.id!==id) });
+  const addProduct    = p => { setSyncSt("saving"); DB.ref(PATH+"/products").transaction(cur=>[...toArr(cur).filter(Boolean),p],(e,c)=>{ setSyncSt(e||!c?"error":"synced"); }); };
+  const editProduct   = p => { setSyncSt("saving"); DB.ref(PATH+"/products").transaction(cur=>toArr(cur).filter(Boolean).map(x=>x.id===p.id?p:x),(e,c)=>{ setSyncSt(e||!c?"error":"synced"); }); };
+  const deleteProduct = id => { setSyncSt("saving"); DB.ref(PATH+"/products").transaction(cur=>toArr(cur).filter(Boolean).filter(x=>x.id!==id),(e,c)=>{ setSyncSt(e||!c?"error":"synced"); }); };
 
   // Doctors
-  const addDoctor    = d => { save({ ...data, doctors: [...(data.doctors||[]), d] }); notify("Doctor added!"); };
-  const editDoctor   = d => { const exists=(data.doctors||[]).some(x=>x.id===d.id); const next=exists?(data.doctors||[]).map(x=>x.id===d.id?d:x):[...(data.doctors||[]),d]; save({...data,doctors:next}); notify("Doctor updated!"); };
-  const deleteDoctor = id => { save({ ...data, doctors: (data.doctors||[]).filter(x=>x.id!==id) }); notify("Deleted","red"); };
+  const addDoctor    = d => {
+    setSyncSt("saving");
+    DB.ref(PATH+"/doctors").transaction(cur => [...toArr(cur).filter(Boolean), d], (err,committed)=>{
+      if (err||!committed) { console.error("addDoctor failed:",err); setSyncSt("error"); }
+      else { setSyncSt("synced"); notify("Doctor added!"); }
+    });
+  };
+  const editDoctor   = d => {
+    setSyncSt("saving");
+    DB.ref(PATH+"/doctors").transaction(cur => {
+      const arr = toArr(cur).filter(Boolean);
+      const exists = arr.some(x=>x.id===d.id);
+      return exists ? arr.map(x=>x.id===d.id?d:x) : [...arr, d];
+    }, (err,committed)=>{
+      if (err||!committed) { console.error("editDoctor failed:",err); setSyncSt("error"); }
+      else { setSyncSt("synced"); notify("Doctor updated!"); }
+    });
+  };
+  const deleteDoctor = id => {
+    setSyncSt("saving");
+    DB.ref(PATH+"/doctors").transaction(cur => toArr(cur).filter(Boolean).filter(x=>x.id!==id), (err,committed)=>{
+      if (err||!committed) { console.error("deleteDoctor failed:",err); setSyncSt("error"); }
+      else { setSyncSt("synced"); notify("Deleted","red"); }
+    });
+  };
 
   // Gift Items (master)
-  const addGiftItem    = g => { save({ ...data, giftItems: [...(data.giftItems||[]), g] }); notify("Gift item added!"); };
-  const editGiftItem   = g => { save({ ...data, giftItems: (data.giftItems||[]).map(x => x.id===g.id ? g : x) }); notify("Gift item updated!"); };
-  const deleteGiftItem = id => { save({ ...data, giftItems: (data.giftItems||[]).filter(x => x.id!==id) }); notify("Deleted","red"); };
+  const addGiftItem    = g => {
+    setSyncSt("saving");
+    DB.ref(PATH+"/giftItems").transaction(cur => [...toArr(cur).filter(Boolean), g], (err,committed)=>{
+      if (err||!committed) { console.error("addGiftItem failed:",err); setSyncSt("error"); }
+      else { setSyncSt("synced"); notify("Gift item added!"); }
+    });
+  };
+  const editGiftItem   = g => {
+    setSyncSt("saving");
+    DB.ref(PATH+"/giftItems").transaction(cur => toArr(cur).filter(Boolean).map(x=>x.id===g.id?g:x), (err,committed)=>{
+      if (err||!committed) { console.error("editGiftItem failed:",err); setSyncSt("error"); }
+      else { setSyncSt("synced"); notify("Gift item updated!"); }
+    });
+  };
+  const deleteGiftItem = id => {
+    setSyncSt("saving");
+    DB.ref(PATH+"/giftItems").transaction(cur => toArr(cur).filter(Boolean).filter(x=>x.id!==id), (err,committed)=>{
+      if (err||!committed) { console.error("deleteGiftItem failed:",err); setSyncSt("error"); }
+      else { setSyncSt("synced"); notify("Deleted","red"); }
+    });
+  };
 
   // Gifts
   // Gifts — all ops use index-targeted writes, no push(), no full array overwrite
   const giftsRef = () => DB.ref(PATH + "/gifts");
 
   const saveGift = g => {
-    // Use dataRef for always-current index lookup — no Firebase read needed
-    const cur = toArr((dataRef.current||data||{}).gifts).filter(Boolean);
-    const idx = cur.findIndex(x=>x&&x.id===g.id);
     setSyncSt("saving");
-    if (idx !== -1) {
-      DB.ref(PATH+"/gifts/"+idx).set(g)
-        .then(()=>{ setSyncSt("synced"); notify("Gift entry updated!"); })
-        .catch(e=>{ console.error(e); setSyncSt("error"); });
-    } else {
-      DB.ref(PATH+"/gifts/"+cur.length).set(g)
-        .then(()=>{ setSyncSt("synced"); notify("Gift entry saved!"); })
-        .catch(e=>{ console.error(e); setSyncSt("error"); });
-    }
+    // Transaction guarantees correct index/append regardless of local state staleness
+    let wasNew = false;
+    DB.ref(PATH+"/gifts").transaction(current => {
+      const arr = toArr(current).filter(Boolean);
+      const idx = arr.findIndex(x=>x&&x.id===g.id);
+      if (idx !== -1) {
+        arr[idx] = g;
+        wasNew = false;
+      } else {
+        arr.push(g);
+        wasNew = true;
+      }
+      return arr;
+    }, (err, committed) => {
+      if (err || !committed) { console.error("saveGift tx failed:", err); setSyncSt("error"); }
+      else { setSyncSt("synced"); notify(wasNew ? "Gift entry saved!" : "Gift entry updated!"); }
+    });
   };
   const bulkAddGifts = (entries) => {
-    const cur = toArr((dataRef.current||data||{}).gifts).filter(Boolean);
-    const updates = {};
-    entries.forEach((e,i)=>{ updates[cur.length+i]=e; });
     setSyncSt("saving");
-    DB.ref(PATH+"/gifts").update(updates)
-      .then(()=>setSyncSt("synced"))
-      .catch(e=>{ console.error(e); setSyncSt("error"); });
+    // Use transaction to guarantee atomic append regardless of local state staleness
+    DB.ref(PATH+"/gifts").transaction(current => {
+      const arr = toArr(current).filter(Boolean);
+      return [...arr, ...entries];
+    }, (err, committed) => {
+      if (err || !committed) { console.error("bulkAddGifts tx failed:", err); setSyncSt("error"); }
+      else setSyncSt("synced");
+    });
   };
   const bulkEditGifts = (updatedGifts, count, giftName) => {
     setSyncSt("saving");
-    giftsRef().once("value").then(snap=>{
-      const raw = snap.val();
-      const arr = Array.isArray(raw) ? raw : Object.values(raw||{});
-      const idMap = new Map(updatedGifts.map(u=>[u.id,u]));
-      const updates = {};
-      arr.forEach((g,i)=>{ if(g&&idMap.has(g.id)) updates[i]=idMap.get(g.id); });
-      return DB.ref(PATH+"/gifts").update(updates);
-    }).then(()=>{ setSyncSt("synced"); notify("✅ "+count+" entries updated to "+giftName); })
-    .catch(e=>{ console.error(e); setSyncSt("error"); });
+    const idMap = new Map(updatedGifts.map(u=>[u.id,u]));
+    giftsRef().transaction(current => {
+      const arr = toArr(current).filter(Boolean);
+      return arr.map(g=>idMap.has(g.id)?idMap.get(g.id):g);
+    }, (err, committed) => {
+      if (err || !committed) { console.error("bulkEditGifts tx failed:", err); setSyncSt("error"); }
+      else { setSyncSt("synced"); notify("✅ "+count+" entries updated to "+giftName); }
+    });
   };
   const deleteGift = id => {
     setSyncSt("saving");
-    giftsRef().once("value").then(snap=>{
-      const arr = toArr(snap.val()).filter(Boolean);
-      return giftsRef().set(arr.filter(x=>x.id!==id));
-    }).then(()=>{ setSyncSt("synced"); notify("Deleted","red"); })
-    .catch(e=>{ console.error(e); setSyncSt("error"); });
+    giftsRef().transaction(current => {
+      const arr = toArr(current).filter(Boolean);
+      return arr.filter(x=>x.id!==id);
+    }, (err, committed) => {
+      if (err || !committed) { console.error("deleteGift tx failed:", err); setSyncSt("error"); }
+      else { setSyncSt("synced"); notify("Deleted","red"); }
+    });
   };
 
   const handleShare = async (type, gifts, label, level, treeData) => {
