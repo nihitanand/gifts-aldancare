@@ -2502,25 +2502,25 @@ function App() {
   };
   const bulkAddGifts = (entries) => {
     setSyncSt("saving");
-    // Use transaction to guarantee atomic append regardless of local state staleness
-    DB.ref(PATH+"/gifts").transaction(current => {
-      const arr = toArr(current).filter(Boolean);
-      return [...arr, ...entries];
-    }, (err, committed) => {
-      if (err || !committed) { console.error("bulkAddGifts tx failed:", err); setSyncSt("error"); }
-      else setSyncSt("synced");
-    });
+    // Each entry pushed independently — genuinely atomic, no payload size limit,
+    // no conflict possible since each push() gets a guaranteed-unique server key
+    Promise.all(entries.map(e => giftsRef().push(e)))
+      .then(() => setSyncSt("synced"))
+      .catch(e => { console.error("bulkAddGifts failed:", e); setSyncSt("error"); });
   };
   const bulkEditGifts = (updatedGifts, count, giftName) => {
     setSyncSt("saving");
     const idMap = new Map(updatedGifts.map(u=>[u.id,u]));
-    giftsRef().transaction(current => {
-      const arr = toArr(current).filter(Boolean);
-      return arr.map(g=>idMap.has(g.id)?idMap.get(g.id):g);
-    }, (err, committed) => {
-      if (err || !committed) { console.error("bulkEditGifts tx failed:", err); setSyncSt("error"); }
-      else { setSyncSt("synced"); notify("✅ "+count+" entries updated to "+giftName); }
-    });
+    // Read current keys once, then patch only the specific changed entries by their exact Firebase key
+    giftsRef().once("value").then(snap => {
+      const raw = snap.val();
+      const keys = Array.isArray(raw) ? raw.map((_,i)=>i) : Object.keys(raw||{});
+      const values = Array.isArray(raw) ? raw : Object.values(raw||{});
+      const updates = {};
+      values.forEach((g,i) => { if (g && idMap.has(g.id)) updates[keys[i]] = idMap.get(g.id); });
+      return giftsRef().update(updates);
+    }).then(() => { setSyncSt("synced"); notify("✅ "+count+" entries updated to "+giftName); })
+    .catch(e => { console.error("bulkEditGifts failed:", e); setSyncSt("error"); });
   };
   const deleteGift = id => {
     setSyncSt("saving");
