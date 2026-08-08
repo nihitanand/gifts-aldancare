@@ -176,7 +176,7 @@ const SEED_STATE = {
 const BG = () => ({
   // Plan
   asmName: "", hqName: "", doctorName: "", doctorMobile: "", speciality: "", location: "",
-  month: CUR_MONTH, giftName: "", giftMrp: "", giftPhotoUrl: "",
+  month: CUR_MONTH, giftName: "", giftMrp: "",
   crmType: "Non-CRM",
   planSales:     [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
   crmPlanSales:  [{ id: uid(), prod: "", qty: "", ptr: "", amt: "" }],
@@ -480,7 +480,7 @@ function GiftModal({ open, onClose, onSave, initial, products, doctors, gifts, g
                     <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                       {(giftItems||[]).map(gi=>(
                         <button key={gi.id} type="button"
-                          onClick={()=>{ set("giftName",gi.name); set("giftMrp",gi.mrp); set("giftPhotoUrl",gi.photoUrl||""); }}
+                          onClick={()=>{ set("giftName",gi.name); set("giftMrp",gi.mrp); }}
                           style={{display:"flex",alignItems:"center",gap:8,padding:"6px 12px",border:"1.5px solid",
                             borderColor:form.giftName===gi.name?"#2563eb":"#e2e8f0",
                             background:form.giftName===gi.name?"#eff6ff":"white",
@@ -501,7 +501,7 @@ function GiftModal({ open, onClose, onSave, initial, products, doctors, gifts, g
                   <input value={form.giftName} onChange={e=>set("giftName",e.target.value)} className="inp" placeholder="Gift name"/>
                   <input type="number" value={form.giftMrp} onChange={e=>set("giftMrp",e.target.value)} className="inp mono" placeholder="MRP (₹)"/>
                 </div>
-                {form.giftPhotoUrl && <img src={form.giftPhotoUrl} alt="gift" style={{width:40,height:40,objectFit:"cover",borderRadius:8,border:"1.5px solid #e2e8f0",marginTop:6}}/>}
+                {(() => { const gi=(giftItems||[]).find(x=>x.name===form.giftName); return gi&&gi.photoUrl ? <img src={gi.photoUrl} alt="gift" style={{width:40,height:40,objectFit:"cover",borderRadius:8,border:"1.5px solid #e2e8f0",marginTop:6}}/> : null; })()}
               </div>
               {/* Expected Sales — CRM shows two tables */}
               <div className="col-span-2">
@@ -1047,7 +1047,6 @@ function CopyMonthModal({ gifts, giftItems, onClose, onBulkAdd }) {
       month: tgtMonth,
       giftName: selGift.name,
       giftMrp: selGift.mrp,
-      giftPhotoUrl: selGift.photoUrl||"",
       issued: false, issueDate:"", issuedPhotoUrl:"",
       planSales:     copyPlanSales ? (g.planSales||blankSales)     : blankSales,
       crmPlanSales:  copyPlanSales ? (g.crmPlanSales||blankSales)  : blankSales,
@@ -1233,7 +1232,7 @@ function GiftsTable({ gifts, products, giftItems, doctors: data_doctors, onEdit,
     const gi=(giftItems||[]).find(x=>x.id===bulkGiftId);
     if(!gi) return;
     const ids=new Set(filtered.filter(g=>bulkSel[g.id]).map(g=>g.id));
-    const updatedGifts=gifts.map(g=>ids.has(g.id)?{...g,giftName:gi.name,giftMrp:gi.mrp,giftPhotoUrl:gi.photoUrl||""}:g);
+    const updatedGifts=gifts.map(g=>ids.has(g.id)?{...g,giftName:gi.name,giftMrp:gi.mrp}:g);
     onBulkEdit(updatedGifts, ids.size, gi.name);
     setBulkMode(false); setBulkSel({}); setBulkGiftId(""); setBulkGiftModal(false);
   };
